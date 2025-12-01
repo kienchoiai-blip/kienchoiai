@@ -11,12 +11,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
 
 # ==========================================
-# 🔑 API KEY - Ưu tiên environment variable, fallback về hardcoded cho local dev
-MY_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCK3CI7Z3FEap9MCMxRFjAPWOcvekzTlTA")
+# 🔑 API KEY - CHỈ dùng environment variable (KHÔNG hardcode để tránh leak)
+# Lấy từ environment variable GEMINI_API_KEY
+# Trên Render: Settings > Environment > Add GEMINI_API_KEY
+# Local dev: Tạo file .env với GEMINI_API_KEY=your_key_here
+MY_API_KEY = os.getenv("GEMINI_API_KEY")
 # ==========================================
 
 if not MY_API_KEY or MY_API_KEY == "":
-    raise ValueError("GEMINI_API_KEY không được tìm thấy! Vui lòng set environment variable GEMINI_API_KEY")
+    raise ValueError(
+        "❌ GEMINI_API_KEY không được tìm thấy!\n\n"
+        "💡 Cách khắc phục:\n"
+        "• Trên Render: Vào Settings > Environment > Thêm GEMINI_API_KEY\n"
+        "• Local dev: Tạo file .env với nội dung: GEMINI_API_KEY=your_key_here\n"
+        "• Hoặc set environment variable: export GEMINI_API_KEY=your_key_here"
+    )
 
 genai.configure(api_key=MY_API_KEY)
 
