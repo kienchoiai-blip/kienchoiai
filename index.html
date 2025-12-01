@@ -1,0 +1,1763 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ViESCRIPT – Studio Kịch Bản AI</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    
+    <!-- Icons & Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://kit.fontawesome.com/4ad8c1c431.js" crossorigin="anonymous"></script>
+    
+    <!-- Tailwind Config -->
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              display: ['Outfit', 'sans-serif'],
+            },
+            colors: {
+              dark: {
+                900: '#0a0a0c',
+                800: '#121216',
+                700: '#1c1c21',
+                600: '#27272f',
+              },
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+
+    <style>
+      body {
+        background-color: #0a0a0c;
+        background-image: 
+          radial-gradient(at 50% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+          radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.05) 0px, transparent 50%);
+        background-attachment: fixed;
+      }
+      
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #27272f; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+      .glass {
+        background: rgba(18, 18, 22, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      
+      .glass-card {
+        background: rgba(28, 28, 33, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        transition: all 0.2s ease;
+      }
+      .glass-card:hover {
+        background: rgba(39, 39, 47, 0.8);
+        border-color: rgba(255, 255, 255, 0.08);
+        transform: translateY(-2px);
+      }
+
+      .text-gradient {
+        background: linear-gradient(135deg, #60a5fa, #c084fc);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .btn-gradient {
+        background: linear-gradient(135deg, #2563eb, #7c3aed);
+        box-shadow: 0 4px 20px -4px rgba(79, 70, 229, 0.4);
+        transition: all 0.3s ease;
+      }
+      .btn-gradient:hover {
+        box-shadow: 0 8px 25px -4px rgba(79, 70, 229, 0.6);
+        filter: brightness(1.1);
+      }
+      .btn-gradient:disabled { opacity: 0.7; cursor: not-allowed; filter: grayscale(0.5); }
+
+      .custom-input {
+        background: rgba(18, 18, 22, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: all 0.2s;
+      }
+      .custom-input:focus {
+        background: rgba(18, 18, 22, 0.9);
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        outline: none;
+      }
+      
+      .history-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body class="text-slate-300 antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
+
+    <!-- APP CONTAINER -->
+    <div class="min-h-screen flex flex-col">
+      
+      <!-- HEADER -->
+      <header class="glass sticky top-0 z-50 border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" id="homeLogo">
+            <!-- Logo SVG: Script Document với AI Sparkles -->
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30 relative overflow-hidden">
+              <svg viewBox="0 0 40 40" class="w-6 h-6 absolute z-10">
+                <!-- Document/Script -->
+                <rect x="10" y="6" width="20" height="28" rx="2" fill="rgba(255,255,255,0.95)" />
+                <line x1="14" y1="12" x2="26" y2="12" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="14" y1="17" x2="24" y2="17" stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="14" y1="22" x2="26" y2="22" stroke="#ec4899" stroke-width="1.5" stroke-linecap="round" />
+                <!-- AI Sparkles -->
+                <circle cx="28" cy="10" r="2.5" fill="#fbbf24" opacity="0.9">
+                  <animate attributeName="opacity" values="0.9;0.3;0.9" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="30" cy="14" r="1.5" fill="#60a5fa" opacity="0.8">
+                  <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            </div>
+            <div>
+              <h1 class="font-display font-bold text-xl tracking-tight text-white leading-none">
+                <span class="text-gradient">ViE</span><span class="text-white">SCRIPT</span>
+              </h1>
+              <p class="text-[10px] text-slate-500 font-medium tracking-widest uppercase mt-0.5">Studio Kịch Bản AI</p>
+            </div>
+          </div>
+
+          <div id="userControls" class="hidden flex items-center gap-4">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5">
+              <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+              <span id="currentUsername" class="text-xs font-semibold text-slate-200">User</span>
+            </div>
+            <button id="adminPanelBtn" class="hidden text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 px-3 py-1.5 rounded-lg transition font-medium flex items-center gap-2 border border-purple-500/30">
+              <i class="fa-solid fa-shield-halved"></i> Quản lý
+            </button>
+            <button id="logoutBtn" class="text-xs font-medium text-slate-400 hover:text-white transition flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Đăng xuất
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- MAIN CONTENT -->
+      <main class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8">
+        
+        <!-- LOGIN VIEW -->
+        <section id="authView" class="max-w-md mx-auto mt-10 lg:mt-20 animate-fade-in">
+          <div class="glass rounded-3xl p-8 sm:p-10 shadow-2xl">
+            <div class="text-center mb-8">
+              <h2 class="font-display text-2xl font-bold text-white mb-2">Chào mừng trở lại</h2>
+              <p class="text-sm text-slate-400">Đăng nhập để quản lý kịch bản của bạn</p>
+            </div>
+
+            <div class="flex p-1 bg-dark-800/50 rounded-xl mb-6 border border-white/5">
+              <button id="loginTab" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-dark-700 text-white shadow-sm transition-all">Đăng nhập</button>
+              <button id="registerTab" class="flex-1 py-2 text-sm font-medium text-slate-500 hover:text-slate-300 transition-all">Đăng ký</button>
+            </div>
+
+            <form id="loginForm" class="space-y-5">
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-slate-400 ml-1">Tài khoản</label>
+                <input id="loginUsername" type="text" class="custom-input w-full rounded-xl py-3 px-4 text-sm text-white placeholder-slate-600" placeholder="Nhập username">
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-slate-400 ml-1">Mật khẩu</label>
+                <input id="loginPassword" type="password" class="custom-input w-full rounded-xl py-3 px-4 text-sm text-white placeholder-slate-600" placeholder="••••••••">
+              </div>
+              <div id="loginError" class="hidden px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                <i class="fa-solid fa-circle-exclamation"></i> <span class="flex-1">Lỗi đăng nhập</span>
+              </div>
+              <button type="submit" class="btn-gradient w-full py-3 rounded-xl text-sm font-bold text-white tracking-wide flex items-center justify-center gap-2">
+                <span>Vào Studio</span>
+                <span id="loginSpinner" class="hidden spinner w-4 h-4 border-2"></span>
+              </button>
+            </form>
+
+            <form id="registerForm" class="space-y-5 hidden">
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-slate-400 ml-1">Tài khoản mới</label>
+                <input id="registerUsername" type="text" class="custom-input w-full rounded-xl py-3 px-4 text-sm text-white placeholder-slate-600" placeholder="Chọn username">
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-xs font-medium text-slate-400 ml-1">Mật khẩu</label>
+                <input id="registerPassword" type="password" class="custom-input w-full rounded-xl py-3 px-4 text-sm text-white placeholder-slate-600" placeholder="Tối thiểu 6 ký tự">
+              </div>
+              <div id="registerError" class="hidden px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                <i class="fa-solid fa-circle-exclamation"></i> <span>Lỗi đăng ký</span>
+              </div>
+              <button type="submit" class="btn-gradient w-full py-3 rounded-xl text-sm font-bold text-white tracking-wide flex items-center justify-center gap-2">
+                <span>Tạo tài khoản</span>
+                <span id="registerSpinner" class="hidden spinner w-4 h-4 border-2"></span>
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <!-- APP VIEW (Optimized Layout) -->
+        <section id="appView" class="hidden animate-fade-in space-y-8">
+          
+          <!-- TOP SECTION: INPUT + TOOL -->
+          <div class="grid lg:grid-cols-12 gap-6">
+            <!-- Input Area (Left/Top) -->
+            <div class="lg:col-span-5 xl:col-span-4 space-y-6">
+              <div class="glass rounded-3xl p-6 border border-white/5">
+                <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <i class="fa-solid fa-sliders text-blue-400"></i> Cấu hình
+                </h2>
+                
+                <!-- URL -->
+                <div class="space-y-3 mb-6">
+                  <label class="text-xs font-medium text-slate-400 ml-1">Link Video</label>
+                  <div class="relative group">
+                    <input id="videoUrl" type="text" 
+                      class="custom-input w-full rounded-xl py-3 px-4 text-sm text-white placeholder-slate-600" 
+                      placeholder="TikTok, Reels, Shorts..." />
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 text-lg opacity-30 pointer-events-none">
+                      <i class="fa-brands fa-tiktok platform-icon" data-platform="tiktok"></i>
+                      <i class="fa-brands fa-instagram platform-icon" data-platform="instagram"></i>
+                      <i class="fa-brands fa-facebook platform-icon" data-platform="facebook"></i>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Options -->
+                <div class="space-y-3 mb-6">
+                  <label class="text-xs font-medium text-slate-400 ml-1">Chế độ xử lý</label>
+                  <div class="grid grid-cols-1 gap-3">
+                    <label class="relative rounded-xl p-4 cursor-pointer group flex items-center gap-3 transition-all duration-300 
+                      bg-dark-800/40 border-2 border-slate-700/50
+                      peer-checked:bg-gradient-to-br peer-checked:from-blue-500/20 peer-checked:to-indigo-600/20
+                      peer-checked:border-blue-500 peer-checked:shadow-lg peer-checked:shadow-blue-500/30
+                      hover:border-blue-500/50 hover:bg-dark-800/60
+                      active:scale-[0.98]">
+                      <input type="radio" name="scriptMode" value="detailed" class="peer hidden" checked />
+                      <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0 
+                        peer-checked:bg-gradient-to-br peer-checked:from-blue-500 peer-checked:to-indigo-600 
+                        peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-blue-500/50
+                        transition-all duration-300 transform peer-checked:scale-110">
+                        <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+                      </div>
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                          <span class="block text-sm font-bold text-slate-200 peer-checked:text-white transition-colors">Phân tích Chi Tiết</span>
+                          <div class="hidden peer-checked:block">
+                            <i class="fa-solid fa-circle-check text-blue-400 text-xs"></i>
+                          </div>
+                        </div>
+                        <span class="block text-[10px] text-slate-500 peer-checked:text-slate-400 mt-0.5">Bối cảnh, góc quay & lời thoại đầy đủ</span>
+                      </div>
+                      <div class="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500/0 border-2 border-transparent 
+                        peer-checked:bg-blue-500 peer-checked:border-white 
+                        flex items-center justify-center transition-all duration-300 transform peer-checked:scale-100 scale-0">
+                        <i class="fa-solid fa-check text-white text-[10px]"></i>
+                      </div>
+                    </label>
+
+                    <label class="relative rounded-xl p-4 cursor-pointer group flex items-center gap-3 transition-all duration-300 
+                      bg-dark-800/40 border-2 border-slate-700/50
+                      peer-checked:bg-gradient-to-br peer-checked:from-purple-500/20 peer-checked:to-pink-600/20
+                      peer-checked:border-purple-500 peer-checked:shadow-lg peer-checked:shadow-purple-500/30
+                      hover:border-purple-500/50 hover:bg-dark-800/60
+                      active:scale-[0.98]">
+                      <input type="radio" name="scriptMode" value="transcript" class="peer hidden" />
+                      <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 shrink-0 
+                        peer-checked:bg-gradient-to-br peer-checked:from-purple-500 peer-checked:to-pink-600 
+                        peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-purple-500/50
+                        transition-all duration-300 transform peer-checked:scale-110">
+                        <i class="fa-solid fa-closed-captioning text-sm"></i>
+                      </div>
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                          <span class="block text-sm font-bold text-slate-200 peer-checked:text-white transition-colors">Chỉ Lấy Lời Thoại</span>
+                          <div class="hidden peer-checked:block">
+                            <i class="fa-solid fa-circle-check text-purple-400 text-xs"></i>
+                          </div>
+                        </div>
+                        <span class="block text-[10px] text-slate-500 peer-checked:text-slate-400 mt-0.5">Dịch transcript sang tiếng Việt</span>
+                      </div>
+                      <div class="absolute top-2 right-2 w-5 h-5 rounded-full bg-purple-500/0 border-2 border-transparent 
+                        peer-checked:bg-purple-500 peer-checked:border-white 
+                        flex items-center justify-center transition-all duration-300 transform peer-checked:scale-100 scale-0">
+                        <i class="fa-solid fa-check text-white text-[10px]"></i>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <button id="generateBtn" class="btn-gradient w-full py-3.5 rounded-xl text-sm font-bold text-white tracking-wide flex items-center justify-center gap-2 transform active:scale-[0.98] transition-all">
+                  <i class="fa-solid fa-bolt text-yellow-300"></i>
+                  <span class="btn-label">Tạo Kịch Bản Ngay</span>
+                  <span id="spinner" class="hidden spinner w-4 h-4 border-2"></span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Result Area (Right/Center - Priority) -->
+            <div class="lg:col-span-7 xl:col-span-8">
+              <div id="resultSection" class="hidden h-full flex flex-col animate-fade-in">
+                <div class="glass rounded-3xl flex-1 flex flex-col overflow-hidden border border-white/5 shadow-2xl min-h-[500px]">
+                  <!-- Toolbar -->
+                  <div class="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                        <i class="fa-solid fa-file-lines text-white text-xs"></i>
+                      </div>
+                      <div>
+                        <h3 class="font-bold text-white text-sm">Kịch Bản AI</h3>
+                        <p class="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Ready to use</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button id="toggleTimestampBtn" class="relative text-xs 
+                        bg-white/5 hover:bg-white/10 
+                        text-slate-300 hover:text-white 
+                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        active:scale-[0.97] transform
+                        group">
+                        <i class="fa-solid fa-clock text-xs transition-all duration-200 group-hover:text-blue-400"></i>
+                        <span class="timestamp-text">Ẩn thời gian</span>
+                      </button>
+                      <button id="copyBtn" class="relative text-xs 
+                        bg-white/5 hover:bg-white/10 
+                        text-slate-300 hover:text-white 
+                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        active:scale-[0.97] transform
+                        group overflow-hidden">
+                        <i class="fa-regular fa-copy text-xs transition-all duration-200 group-hover:text-emerald-400"></i>
+                        <span class="copy-text">Sao chép</span>
+                        <span class="copy-success hidden absolute inset-0 items-center justify-center gap-1.5 
+                          bg-emerald-500/90 backdrop-blur-sm rounded-lg text-white text-xs font-medium">
+                          <i class="fa-solid fa-check text-[10px]"></i>
+                          <span>Đã chép</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Editor -->
+                  <div class="flex-1 relative bg-[#0f0f11]">
+                    <textarea id="scriptOutput" class="absolute inset-0 w-full h-full bg-transparent text-base text-slate-300 p-6 focus:outline-none resize-none leading-relaxed custom-scrollbar" readonly placeholder="Nội dung kịch bản sẽ xuất hiện ở đây..."></textarea>
+                  </div>
+
+                  <!-- Stats Footer -->
+                  <div class="bg-dark-800/50 backdrop-blur border-t border-white/5 px-6 py-3 flex items-center justify-between gap-4 text-xs">
+                    <div class="flex items-center gap-6">
+                      <div class="flex items-center gap-2">
+                        <span class="text-slate-500 font-medium">Số từ:</span>
+                        <span id="wordCount" class="text-white font-bold">—</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-slate-500 font-medium">Thời lượng:</span>
+                        <span id="duration" class="text-blue-400 font-bold">—</span>
+                      </div>
+                    </div>
+                    <button id="translateBtn" class="font-bold text-purple-400 hover:text-purple-300 px-3 py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/30 uppercase text-[10px] transition-all cursor-pointer flex items-center gap-1.5">
+                      <i class="fa-solid fa-language"></i>
+                      <span id="tone">DỊCH THUẬT</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Placeholder when no result -->
+              <div id="emptyState" class="h-full min-h-[400px] glass rounded-3xl border border-white/5 flex flex-col items-center justify-center text-slate-600 gap-4 p-8">
+                <div class="w-20 h-20 rounded-3xl bg-dark-800 flex items-center justify-center border border-white/5">
+                  <i class="fa-solid fa-wand-magic-sparkles text-3xl opacity-20"></i>
+                </div>
+                <div class="text-center max-w-xs">
+                  <h3 class="text-lg font-bold text-slate-500 mb-1">Chưa có nội dung</h3>
+                  <p class="text-sm opacity-60">Chọn chế độ và dán link video để AI bắt đầu phân tích kịch bản cho bạn.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM SECTION: HISTORY -->
+          <div class="space-y-4">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 px-1">
+              <i class="fa-solid fa-clock-rotate-left text-slate-500"></i> Lịch sử hoạt động
+            </h3>
+            <div id="historyList" class="history-grid pb-10">
+              <!-- History items will be injected here -->
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ADMIN PANEL -->
+        <section id="adminPanel" class="hidden animate-fade-in">
+          <div class="space-y-6">
+            <!-- Header -->
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                  <i class="fa-solid fa-shield-halved text-purple-400"></i>
+                  Quản lý Người dùng
+                </h2>
+                <p class="text-sm text-slate-400 mt-1">Quản lý tất cả tài khoản khách hàng và admin</p>
+              </div>
+              <button id="closeAdminPanel" class="text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-times text-xl"></i>
+              </button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div id="adminStats" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <!-- Stats will be loaded here -->
+            </div>
+
+            <!-- Users Table -->
+            <div class="glass rounded-3xl border border-white/5 overflow-hidden">
+              <div class="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                  <i class="fa-solid fa-users text-blue-400"></i>
+                  Danh sách Người dùng
+                </h3>
+                <button id="refreshUsersBtn" class="text-xs bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-lg transition font-medium flex items-center gap-2 border border-white/5">
+                  <i class="fa-solid fa-arrow-rotate-right"></i> Làm mới
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead class="bg-dark-800/50 border-b border-white/5">
+                    <tr>
+                      <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">ID</th>
+                      <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Username</th>
+                      <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Vai trò</th>
+                      <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Số kịch bản</th>
+                      <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Ngày tạo</th>
+                      <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTableBody" class="divide-y divide-white/5">
+                    <!-- Users will be loaded here -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- USER SCRIPTS MODAL -->
+        <div id="userScriptsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div class="glass rounded-3xl border border-white/5 shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-white text-lg flex items-center gap-2">
+                  <i class="fa-solid fa-file-lines text-purple-400"></i>
+                  <span id="userScriptsModalTitle">Kịch bản của người dùng</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-1" id="userScriptsModalSubtitle">Danh sách kịch bản</p>
+              </div>
+              <button id="closeUserScriptsModal" class="text-slate-400 hover:text-white hover:bg-white/10 transition px-3 py-2 rounded-lg border border-white/10 hover:border-white/20">
+                <i class="fa-solid fa-times text-lg"></i>
+              </button>
+            </div>
+
+            <!-- Scripts List -->
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+              <div id="userScriptsList" class="space-y-3">
+                <!-- Scripts will be loaded here -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOADING MODAL -->
+        <div id="loadingModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div class="glass rounded-3xl border border-white/10 shadow-2xl w-full max-w-md p-8 text-center relative overflow-hidden">
+            <!-- Animated Background -->
+            <div class="absolute inset-0 opacity-10">
+              <div class="absolute top-0 left-0 w-32 h-32 bg-purple-500 rounded-full blur-3xl animate-pulse"></div>
+              <div class="absolute bottom-0 right-0 w-40 h-40 bg-blue-500 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+            </div>
+            
+            <!-- Circular Progress -->
+            <div class="relative w-32 h-32 mx-auto mb-6">
+              <svg class="transform -rotate-90 w-32 h-32">
+                <circle cx="64" cy="64" r="56" stroke="rgba(255,255,255,0.1)" stroke-width="8" fill="none" />
+                <circle id="progressCircle" cx="64" cy="64" r="56" stroke="url(#gradient)" stroke-width="8" fill="none" 
+                  stroke-dasharray="351.86" stroke-dashoffset="351.86" stroke-linecap="round"
+                  class="transition-all duration-300" />
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border-2 border-purple-500/30">
+                  <i id="loadingIcon" class="fa-solid fa-spinner text-2xl text-purple-400 animate-spin"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status Text -->
+            <h3 id="loadingTitle" class="text-xl font-bold text-white mb-2">Đang xử lý...</h3>
+            <p id="loadingSubtitle" class="text-sm text-slate-400 mb-4">Vui lòng đợi trong giây lát</p>
+            
+            <!-- Progress Steps -->
+            <div id="loadingSteps" class="space-y-2 text-left">
+              <!-- Steps will be dynamically added -->
+            </div>
+
+            <!-- Progress Percentage -->
+            <div class="mt-6">
+              <div class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
+                <span id="loadingPercent">0</span>%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRANSLATE MODAL -->
+        <div id="translateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div class="glass rounded-3xl border border-white/5 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-white text-lg flex items-center gap-2">
+                  <i class="fa-solid fa-language text-purple-400"></i>
+                  Chọn Ngôn Ngữ Dịch
+                </h3>
+                <p class="text-xs text-slate-400 mt-1">Dịch kịch bản sang ngôn ngữ bạn muốn</p>
+              </div>
+              <button id="closeTranslateModal" class="text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-times text-xl"></i>
+              </button>
+            </div>
+
+            <!-- Search -->
+            <div class="px-6 py-4 border-b border-white/5">
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                </div>
+                <input id="languageSearch" type="text" 
+                  class="custom-input w-full rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-600" 
+                  placeholder="Tìm kiếm ngôn ngữ (ví dụ: English, 中文, 日本語...)">
+              </div>
+            </div>
+
+            <!-- Languages List -->
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+              <div id="languagesList" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <!-- Languages will be loaded here -->
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+              <span id="selectedLanguage" class="text-xs text-slate-400">Chưa chọn ngôn ngữ</span>
+              <div class="flex gap-2">
+                <button id="cancelTranslate" class="text-xs px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition">
+                  Hủy
+                </button>
+                <button id="confirmTranslate" class="text-xs px-4 py-2 rounded-lg btn-gradient text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                  <i class="fa-solid fa-language"></i> Dịch ngay
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <script>
+      // --- CONFIG ---
+      const API_BASE = "http://127.0.0.1:5000";
+      const TOKEN_KEY = "athena_token";
+      const USER_KEY = "athena_username";
+
+      // --- HELPERS ---
+      const ADMIN_KEY = "athena_is_admin";
+      const auth = {
+        save: (token, user, isAdmin = false) => {
+          localStorage.setItem(TOKEN_KEY, token);
+          localStorage.setItem(USER_KEY, user);
+          localStorage.setItem(ADMIN_KEY, isAdmin ? "true" : "false");
+        },
+        clear: () => {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(ADMIN_KEY);
+        },
+        getToken: () => localStorage.getItem(TOKEN_KEY),
+        getUser: () => localStorage.getItem(USER_KEY),
+        isAdmin: () => {
+          const adminValue = localStorage.getItem(ADMIN_KEY);
+          const isAdmin = adminValue === "true" || adminValue === true;
+          console.log("🔍 auth.isAdmin() check:", { adminValue, isAdmin, type: typeof adminValue });
+          return isAdmin;
+        }
+      };
+
+      // --- UI ELEMENTS ---
+      const UI = {
+        authView: document.getElementById("authView"),
+        appView: document.getElementById("appView"),
+        userControls: document.getElementById("userControls"),
+        currentUser: document.getElementById("currentUsername"),
+        loginForm: document.getElementById("loginForm"),
+        registerForm: document.getElementById("registerForm"),
+        tabs: {
+          login: document.getElementById("loginTab"),
+          register: document.getElementById("registerTab")
+        },
+        inputs: {
+          url: document.getElementById("videoUrl")
+        },
+        btns: {
+          generate: document.getElementById("generateBtn"),
+          copy: document.getElementById("copyBtn"),
+          logout: document.getElementById("logoutBtn"),
+          adminPanel: document.getElementById("adminPanelBtn"),
+          closeAdminPanel: document.getElementById("closeAdminPanel"),
+          refreshUsers: document.getElementById("refreshUsersBtn"),
+          toggleTimestamp: document.getElementById("toggleTimestampBtn"),
+          translate: document.getElementById("translateBtn"),
+          closeTranslateModal: document.getElementById("closeTranslateModal"),
+          cancelTranslate: document.getElementById("cancelTranslate"),
+          confirmTranslate: document.getElementById("confirmTranslate")
+        },
+        translateModal: {
+          modal: document.getElementById("translateModal"),
+          search: document.getElementById("languageSearch"),
+          list: document.getElementById("languagesList"),
+          selected: document.getElementById("selectedLanguage")
+        },
+        adminPanel: {
+          section: document.getElementById("adminPanel"),
+          stats: document.getElementById("adminStats"),
+          tableBody: document.getElementById("usersTableBody")
+        },
+        result: {
+          section: document.getElementById("resultSection"),
+          empty: document.getElementById("emptyState"),
+          output: document.getElementById("scriptOutput"),
+          stats: {
+            word: document.getElementById("wordCount"),
+            time: document.getElementById("duration"),
+            tone: document.getElementById("tone")
+          }
+        },
+        history: document.getElementById("historyList"),
+        labels: {
+          btn: document.querySelector(".btn-label"),
+          spinner: document.getElementById("spinner")
+        }
+      };
+
+      // --- TABS ---
+      UI.tabs.login.onclick = () => switchTab('login');
+      UI.tabs.register.onclick = () => switchTab('register');
+
+      function switchTab(type) {
+        const isLogin = type === 'login';
+        UI.tabs.login.className = isLogin ? "flex-1 py-2 text-sm font-semibold rounded-lg bg-dark-700 text-white shadow-sm transition-all" : "flex-1 py-2 text-sm font-medium text-slate-500 hover:text-slate-300 transition-all";
+        UI.tabs.register.className = !isLogin ? "flex-1 py-2 text-sm font-semibold rounded-lg bg-dark-700 text-white shadow-sm transition-all" : "flex-1 py-2 text-sm font-medium text-slate-500 hover:text-slate-300 transition-all";
+        
+        UI.loginForm.classList.toggle("hidden", !isLogin);
+        UI.registerForm.classList.toggle("hidden", isLogin);
+      }
+
+      // --- PLATFORM ICON ---
+      const platforms = [
+        { key: "tiktok", regex: /tiktok\.com/i },
+        { key: "instagram", regex: /instagram\.com|instagr\.am/i },
+        { key: "facebook", regex: /facebook\.com|fb\.watch/i },
+      ];
+      UI.inputs.url.addEventListener("input", (e) => {
+        document.querySelectorAll(".platform-icon").forEach(i => {
+          i.classList.remove("active", "text-blue-400", "opacity-100");
+          i.classList.add("opacity-40");
+        });
+        platforms.forEach(p => {
+          if (p.regex.test(e.target.value)) {
+            const icon = document.querySelector(`.platform-icon[data-platform="${p.key}"]`);
+            if (icon) {
+              icon.classList.add("active", "text-blue-400", "opacity-100");
+              icon.classList.remove("opacity-40");
+            }
+          }
+        });
+      });
+
+      // --- AUTH ACTIONS ---
+      async function authenticate(endpoint, payload, errorId, spinnerId) {
+        const errEl = document.getElementById(errorId);
+        const spinEl = document.getElementById(spinnerId);
+        errEl.classList.add("hidden");
+        spinEl.classList.remove("hidden");
+        
+        try {
+          const res = await fetch(`${API_BASE}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          
+          if (!res.ok) throw new Error(data.error || "Lỗi kết nối");
+          
+          // Xử lý is_admin từ backend (có thể là boolean hoặc string)
+          const isAdmin = data.is_admin === true || data.is_admin === "true" || String(data.is_admin) === "True";
+          console.log("🔐 Login successful:", { 
+            username: data.username, 
+            is_admin: data.is_admin, 
+            is_admin_type: typeof data.is_admin,
+            isAdmin,
+            isAdmin_type: typeof isAdmin
+          });
+          auth.save(data.token, data.username, isAdmin);
+          // Đợi một chút để đảm bảo localStorage đã được lưu
+          setTimeout(() => {
+            checkState();
+          }, 100);
+        } catch (e) {
+          errEl.querySelector("span").textContent = e.message;
+          errEl.classList.remove("hidden");
+        } finally {
+          spinEl.classList.add("hidden");
+        }
+      }
+
+      UI.loginForm.onsubmit = (e) => {
+        e.preventDefault();
+        const u = document.getElementById("loginUsername").value.trim();
+        const p = document.getElementById("loginPassword").value;
+        if (u && p) authenticate("/login", { username: u, password: p }, "loginError", "loginSpinner");
+      };
+
+      UI.registerForm.onsubmit = (e) => {
+        e.preventDefault();
+        const u = document.getElementById("registerUsername").value.trim();
+        const p = document.getElementById("registerPassword").value;
+        if (u && p) authenticate("/register", { username: u, password: p }, "registerError", "registerSpinner");
+      };
+
+      UI.btns.logout.onclick = () => {
+        auth.clear();
+        checkState();
+        fetch(`${API_BASE}/api/logout`, { method: "POST" }).catch(()=>{});
+      };
+
+      function checkState() {
+        const token = auth.getToken();
+        const user = auth.getUser();
+        const isAdmin = auth.isAdmin();
+        
+        console.log("🔍 Check State:", { token, user, isAdmin }); // Debug
+        
+        if (token && user) {
+          UI.authView.classList.add("hidden");
+          UI.appView.classList.remove("hidden");
+          UI.userControls.classList.remove("hidden");
+          UI.currentUser.textContent = user;
+          
+          // Hiển thị nút quản lý cho admin
+          if (isAdmin) {
+            console.log("✅ Admin detected - showing admin panel button");
+            UI.btns.adminPanel.classList.remove("hidden");
+            UI.btns.adminPanel.style.display = "flex"; // Force display
+            UI.btns.adminPanel.style.visibility = "visible"; // Force visible
+            UI.btns.adminPanel.style.opacity = "1"; // Force opacity
+          } else {
+            console.log("❌ Not admin - hiding admin panel button");
+            UI.btns.adminPanel.classList.add("hidden");
+            UI.btns.adminPanel.style.display = "none";
+          }
+          
+          fetchHistory();
+        } else {
+          UI.authView.classList.remove("hidden");
+          UI.appView.classList.add("hidden");
+          UI.userControls.classList.add("hidden");
+          UI.adminPanel.section.classList.add("hidden");
+          UI.btns.adminPanel.classList.add("hidden");
+        }
+      }
+
+      // --- MAIN LOGIC ---
+      UI.btns.generate.onclick = async () => {
+        const url = UI.inputs.url.value.trim();
+        if (!url) {
+          UI.inputs.url.focus();
+          UI.inputs.url.classList.add("border-red-500");
+          setTimeout(() => UI.inputs.url.classList.remove("border-red-500"), 1500);
+          return;
+        }
+
+        const mode = document.querySelector('input[name="scriptMode"]:checked').value;
+        
+        UI.btns.generate.disabled = true;
+        UI.labels.btn.textContent = "Đang xử lý...";
+        UI.labels.spinner.classList.remove("hidden");
+
+        // Hiển thị loading modal
+        showLoadingModal("Đang tạo kịch bản", [
+          { text: "Đang tải video từ link...", icon: "fa-download" },
+          { text: "Đang gửi video lên AI...", icon: "fa-cloud-upload" },
+          { text: "Đang phân tích nội dung...", icon: "fa-brain" },
+          { text: "Đang tạo kịch bản...", icon: "fa-magic" }
+        ]);
+
+        try {
+          currentProgress = 0;
+          
+          // Bước 1: Tải video (0% -> 25%)
+          await animateProgressTo(25, "Đang tải video từ link...", 1500);
+          
+          // Bước 2: Gửi video lên AI (25% -> 50%)
+          await animateProgressTo(50, "Đang gửi video lên AI...", 2000);
+          
+          // Bắt đầu tăng progress chậm trong khi chờ response
+          startSlowProgress(85);
+          
+          let res;
+          try {
+            res = await fetch(`${API_BASE}/analyze`, {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json", 
+                "Authorization": `Bearer ${auth.getToken()}` 
+              },
+              body: JSON.stringify({ url, mode })
+            });
+          } catch (fetchError) {
+            stopSlowProgress();
+            hideLoadingModal();
+            throw new Error("Lỗi kết nối đến server. Vui lòng thử lại.");
+          }
+          
+          // Dừng slow progress và tiếp tục với progress thực tế
+          stopSlowProgress();
+          
+          // Kiểm tra lỗi trước khi parse JSON
+          if (res.status === 401) {
+            hideLoadingModal();
+            auth.clear();
+            checkState();
+            throw new Error("Hết phiên đăng nhập");
+          }
+          
+          let data;
+          try {
+            data = await res.json();
+          } catch (jsonError) {
+            hideLoadingModal();
+            throw new Error("Lỗi xử lý dữ liệu từ server");
+          }
+          
+          if (!res.ok) {
+            hideLoadingModal();
+            throw new Error(data.error || "Lỗi xử lý");
+          }
+          
+          // Bước 3: Phân tích nội dung (từ currentProgress -> 85%)
+          await animateProgressTo(85, "Đang phân tích nội dung...", 1500);
+          
+          // Bước 4: Tạo kịch bản (85% -> 95%)
+          await animateProgressTo(95, "Đang tạo kịch bản...", 1000);
+
+          // Hoàn thành (90% -> 100%)
+          await animateProgressTo(100, "Hoàn thành!", 800);
+          await sleep(500);
+
+          // Render
+          // Lưu bản gốc (có timestamp) và hiển thị
+          window.originalScript = data.script;
+          window.showTimestamps = true; // Mặc định hiện timestamp
+          UI.result.output.value = data.script;
+          UI.result.section.classList.remove("hidden");
+          UI.result.empty.classList.add("hidden");
+          
+          // Cập nhật nút toggle
+          updateTimestampButton();
+          
+          // Stats
+          const words = data.script.split(/\s+/).length;
+          UI.result.stats.word.textContent = words;
+          UI.result.stats.time.textContent = "~" + Math.round(words/2.5) + "s";
+          UI.result.stats.tone.textContent = mode === "transcript" ? "DỊCH THUẬT" : "SÁNG TẠO";
+
+          fetchHistory();
+          hideLoadingModal();
+
+        } catch (e) {
+          hideLoadingModal();
+          alert(e.message);
+        } finally {
+          UI.btns.generate.disabled = false;
+          UI.labels.btn.textContent = "Tạo Kịch Bản Ngay";
+          UI.labels.spinner.classList.add("hidden");
+        }
+      };
+
+      // --- TIMESTAMP TOGGLE ---
+      function removeTimestamps(text) {
+        if (!text) return '';
+        // Pattern: "[00:00]", "[00:00:00]", "00:00 - ", "00:03 - ", "1:23 - ", etc.
+        // Xử lý nhiều format timestamp khác nhau
+        return text
+          .replace(/\[\d{1,2}:\d{2}\]\s*/g, '') // "[00:00] " hoặc "[1:23] "
+          .replace(/\[\d{1,2}:\d{2}:\d{2}\]\s*/g, '') // "[00:00:00] " hoặc "[1:23:45] "
+          .replace(/\d{1,2}:\d{2}\s*-\s*/g, '') // "00:00 - " hoặc "1:23 - "
+          .replace(/\d{1,2}:\d{2}:\d{2}\s*-\s*/g, '') // "00:00:00 - " hoặc "1:23:45 - "
+          .replace(/\(\d{1,2}:\d{2}\)\s*/g, '') // "(00:00) "
+          .replace(/^\d{1,2}:\d{2}\s+/gm, '') // "00:00 " ở đầu dòng
+          .replace(/^\d{1,2}:\d{2}:\d{2}\s+/gm, '') // "00:00:00 " ở đầu dòng
+          .trim();
+      }
+
+      function updateTimestampButton() {
+        const btn = UI.btns.toggleTimestamp;
+        if (!btn) return;
+        const textSpan = btn.querySelector('.timestamp-text');
+        const icon = btn.querySelector('i');
+        
+        if (window.showTimestamps) {
+          textSpan.textContent = 'Ẩn thời gian';
+          icon.className = 'fa-solid fa-clock text-xs transition-all duration-200 group-hover:text-blue-400';
+          btn.classList.remove('bg-blue-500/20', 'border-blue-500/30');
+          btn.classList.add('bg-white/5', 'border-white/10');
+        } else {
+          textSpan.textContent = 'Hiện thời gian';
+          icon.className = 'fa-solid fa-clock-rotate-left text-xs transition-all duration-200 group-hover:text-blue-400';
+          btn.classList.remove('bg-white/5', 'border-white/10');
+          btn.classList.add('bg-blue-500/20', 'border-blue-500/30');
+        }
+      }
+
+      UI.btns.toggleTimestamp.onclick = () => {
+        if (!window.originalScript) return;
+        
+        window.showTimestamps = !window.showTimestamps;
+        
+        if (window.showTimestamps) {
+          // Hiện lại bản gốc có timestamp
+          UI.result.output.value = window.originalScript;
+        } else {
+          // Ẩn timestamp
+          UI.result.output.value = removeTimestamps(window.originalScript);
+        }
+        
+        updateTimestampButton();
+      };
+
+      UI.btns.copy.onclick = async () => {
+        if (!UI.result.output.value) return;
+        
+        try {
+          await navigator.clipboard.writeText(UI.result.output.value);
+          
+          // Hiệu ứng xác nhận tinh tế
+          const copyText = UI.btns.copy.querySelector('.copy-text');
+          const copySuccess = UI.btns.copy.querySelector('.copy-success');
+          const copyIcon = UI.btns.copy.querySelector('.fa-copy');
+          
+          // Ẩn text và icon gốc
+          copyText.style.opacity = '0';
+          copyIcon.style.opacity = '0';
+          
+          // Hiển thị success message với fade in
+          copySuccess.classList.remove('hidden');
+          copySuccess.classList.add('flex');
+          copySuccess.style.opacity = '0';
+          setTimeout(() => {
+            copySuccess.style.opacity = '1';
+            copySuccess.style.transition = 'opacity 0.2s ease';
+          }, 10);
+          
+          // Thay đổi border nhẹ nhàng
+          UI.btns.copy.classList.remove('border-white/10', 'hover:border-white/20');
+          UI.btns.copy.classList.add('border-emerald-500/40');
+          
+          // Reset sau 1.5 giây
+          setTimeout(() => {
+            copySuccess.style.opacity = '0';
+            setTimeout(() => {
+              copyText.style.opacity = '1';
+              copyIcon.style.opacity = '1';
+              copyText.style.transition = 'opacity 0.2s ease';
+              copyIcon.style.transition = 'opacity 0.2s ease';
+              copySuccess.classList.add('hidden');
+              copySuccess.classList.remove('flex');
+              UI.btns.copy.classList.remove('border-emerald-500/40');
+              UI.btns.copy.classList.add('border-white/10');
+            }, 200);
+          }, 1500);
+          
+        } catch (e) {
+          alert('Không thể sao chép. Vui lòng thử lại.');
+        }
+      };
+
+      async function fetchHistory() {
+        try {
+          const res = await fetch(`${API_BASE}/api/get_history`, {
+            headers: { "Authorization": `Bearer ${auth.getToken()}` }
+          });
+          if (res.status === 401) return auth.clear(), checkState();
+          
+          const data = await res.json();
+          UI.history.innerHTML = "";
+          
+          if (!data.items?.length) {
+            UI.history.innerHTML = `
+              <div class="col-span-full h-32 flex flex-col items-center justify-center text-slate-600 gap-3 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
+                <span class="text-xs font-medium opacity-50">Chưa có lịch sử nào</span>
+              </div>`;
+            return;
+          }
+
+          data.items.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "group p-4 rounded-2xl bg-dark-800/40 hover:bg-dark-800/80 border border-white/5 hover:border-blue-500/30 cursor-pointer transition-all duration-200 shadow-sm hover:-translate-y-1";
+            
+            const date = new Date(item.created_at);
+            const dateStr = date.toLocaleDateString("vi-VN", {day:'2-digit', month:'2-digit'});
+            
+            const isTrans = item.mode === 'transcript';
+            const badgeClass = isTrans 
+              ? "text-purple-400 bg-purple-500/10" 
+              : "text-blue-400 bg-blue-500/10";
+
+            div.innerHTML = `
+              <div class="flex justify-between items-start mb-3">
+                <span class="text-[10px] font-bold px-2 py-1 rounded ${badgeClass}">
+                  ${isTrans ? 'DỊCH' : 'KỊCH BẢN'}
+                </span>
+                <span class="text-[10px] text-slate-600 font-medium group-hover:text-slate-500 transition-colors">${dateStr}</span>
+              </div>
+              <div class="text-xs text-slate-300 line-clamp-2 font-medium leading-relaxed mb-3 h-8 opacity-80 group-hover:opacity-100">
+                ${item.script_content.substring(0, 80)}...
+              </div>
+              <div class="text-[10px] text-slate-600 truncate flex items-center gap-1.5 pt-3 border-t border-white/5">
+                <i class="fa-solid fa-link"></i> ${item.video_url}
+              </div>
+            `;
+            
+            div.onclick = () => {
+              // Lưu bản gốc và reset toggle
+              window.originalScript = item.script_content;
+              window.showTimestamps = true;
+              UI.result.output.value = item.script_content;
+              UI.result.section.classList.remove("hidden");
+              UI.result.empty.classList.add("hidden");
+              
+              // Cập nhật nút toggle
+              updateTimestampButton();
+              
+              const words = item.script_content.split(/\s+/).length;
+              UI.result.stats.word.textContent = words;
+              UI.result.stats.time.textContent = "~" + Math.round(words/2.5) + "s";
+              UI.result.stats.tone.textContent = isTrans ? "DỊCH THUẬT" : "SÁNG TẠO";
+              
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+            UI.history.appendChild(div);
+          });
+
+        } catch (e) { console.error(e); }
+      }
+
+      // --- ADMIN PANEL ---
+      UI.btns.adminPanel.onclick = () => {
+        UI.appView.classList.add("hidden");
+        UI.adminPanel.section.classList.remove("hidden");
+        loadAdminStats();
+        loadUsers();
+      };
+
+      UI.btns.closeAdminPanel.onclick = () => {
+        UI.adminPanel.section.classList.add("hidden");
+        UI.appView.classList.remove("hidden");
+      };
+
+      UI.btns.refreshUsers.onclick = () => {
+        loadAdminStats();
+        loadUsers();
+      };
+
+      async function loadAdminStats() {
+        try {
+          const res = await fetch(`${API_BASE}/api/admin/stats`, {
+            headers: { "Authorization": `Bearer ${auth.getToken()}` }
+          });
+          if (res.status === 401 || res.status === 403) {
+            alert("Bạn không có quyền truy cập");
+            return;
+          }
+          const data = await res.json();
+          
+          UI.adminPanel.stats.innerHTML = `
+            <div class="glass rounded-2xl p-4 border border-white/5 hover:border-blue-500/30 transition-all">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/30 to-blue-600/20 flex items-center justify-center border border-blue-500/30 shadow-lg shadow-blue-500/20">
+                  <i class="fa-solid fa-users text-blue-400 text-lg"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-slate-400 font-medium mb-1">Tổng người dùng</p>
+                  <p class="text-2xl font-bold text-white">${data.total_users}</p>
+                </div>
+              </div>
+            </div>
+            <div class="glass rounded-2xl p-4 border border-white/5 hover:border-purple-500/30 transition-all">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/30 to-purple-600/20 flex items-center justify-center border border-purple-500/30 shadow-lg shadow-purple-500/20">
+                  <i class="fa-solid fa-user-shield text-purple-400 text-lg"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-slate-400 font-medium mb-1">Admin</p>
+                  <p class="text-2xl font-bold text-white">${data.total_admins}</p>
+                </div>
+              </div>
+            </div>
+            <div class="glass rounded-2xl p-4 border border-white/5 hover:border-emerald-500/30 transition-all">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/20 flex items-center justify-center border border-emerald-500/30 shadow-lg shadow-emerald-500/20">
+                  <i class="fa-solid fa-user text-emerald-400 text-lg"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-slate-400 font-medium mb-1">Khách hàng</p>
+                  <p class="text-2xl font-bold text-white">${data.total_customers}</p>
+                </div>
+              </div>
+            </div>
+            <div class="glass rounded-2xl p-4 border border-white/5 hover:border-pink-500/30 transition-all">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/30 to-pink-600/20 flex items-center justify-center border border-pink-500/30 shadow-lg shadow-pink-500/20">
+                  <i class="fa-solid fa-file-lines text-pink-400 text-lg"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-slate-400 font-medium mb-1">Tổng kịch bản</p>
+                  <p class="text-2xl font-bold text-white">${data.total_scripts}</p>
+                </div>
+              </div>
+            </div>
+          `;
+        } catch (e) {
+          console.error("Lỗi load stats:", e);
+        }
+      }
+
+      async function loadUsers() {
+        try {
+          const res = await fetch(`${API_BASE}/api/admin/users`, {
+            headers: { "Authorization": `Bearer ${auth.getToken()}` }
+          });
+          if (res.status === 401 || res.status === 403) {
+            alert("Bạn không có quyền truy cập");
+            return;
+          }
+          const data = await res.json();
+          
+          UI.adminPanel.tableBody.innerHTML = "";
+          
+          if (!data.users || data.users.length === 0) {
+            UI.adminPanel.tableBody.innerHTML = `
+              <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-slate-500">
+                  Chưa có người dùng nào
+                </td>
+              </tr>
+            `;
+            return;
+          }
+
+          data.users.forEach(user => {
+            const row = document.createElement("tr");
+            row.className = "hover:bg-white/5 transition-colors";
+            
+            const date = user.created_at ? new Date(user.created_at).toLocaleDateString("vi-VN") : "—";
+            const roleBadge = user.is_admin 
+              ? '<span class="px-2 py-1 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">ADMIN</span>'
+              : '<span class="px-2 py-1 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">KHÁCH HÀNG</span>';
+            
+            const blockedBadge = user.is_blocked 
+              ? '<span class="px-2 py-1 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">ĐÃ CHẶN</span>'
+              : '';
+            
+            const blockBtn = user.is_admin 
+              ? '<span class="text-slate-600 text-xs">—</span>'
+              : `<button onclick="toggleBlockUser(${user.id}, ${user.is_blocked})" class="text-xs font-medium px-3 py-1.5 rounded-lg transition ${
+                  user.is_blocked 
+                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30' 
+                    : 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30'
+                }">
+                   <i class="fa-solid ${user.is_blocked ? 'fa-unlock' : 'fa-lock'}"></i> ${user.is_blocked ? 'Bỏ chặn' : 'Chặn sử dụng'}
+                 </button>`;
+
+            const scriptsCountCell = user.scripts_count > 0
+              ? `<button onclick="viewUserScripts(${user.id}, '${user.username}')" class="text-blue-400 hover:text-blue-300 transition text-sm font-medium cursor-pointer underline">
+                   ${user.scripts_count}
+                 </button>`
+              : `<span class="text-slate-400 text-sm">${user.scripts_count}</span>`;
+
+            row.innerHTML = `
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">${user.id}</td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center gap-2">
+                  <div class="text-sm font-medium text-white">${user.username}</div>
+                  ${blockedBadge}
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">${roleBadge}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">${scriptsCountCell}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${date}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">${blockBtn}</td>
+            `;
+            UI.adminPanel.tableBody.appendChild(row);
+          });
+        } catch (e) {
+          console.error("Lỗi load users:", e);
+          alert("Lỗi tải danh sách người dùng");
+        }
+      }
+
+      async function toggleBlockUser(userId, isBlocked) {
+        const action = isBlocked ? "bỏ chặn" : "chặn";
+        if (!confirm(`Bạn có chắc chắn muốn ${action} người dùng này?`)) {
+          return;
+        }
+
+        try {
+          const res = await fetch(`${API_BASE}/api/admin/users/${userId}/block`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${auth.getToken()}` }
+          });
+
+          if (res.status === 401 || res.status === 403) {
+            alert("Bạn không có quyền thực hiện thao tác này");
+            return;
+          }
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Lỗi chặn/bỏ chặn người dùng");
+          }
+
+          // Reload danh sách
+          loadAdminStats();
+          loadUsers();
+          const data = await res.json();
+          alert(data.message);
+        } catch (e) {
+          alert(e.message);
+        }
+      }
+
+      async function viewUserScripts(userId, username) {
+        try {
+          const res = await fetch(`${API_BASE}/api/admin/users/${userId}/scripts`, {
+            headers: { "Authorization": `Bearer ${auth.getToken()}` }
+          });
+
+          if (res.status === 401 || res.status === 403) {
+            alert("Bạn không có quyền truy cập");
+            return;
+          }
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Lỗi tải kịch bản");
+          }
+
+          const data = await res.json();
+          document.getElementById("userScriptsModalTitle").textContent = `Kịch bản của ${username}`;
+          document.getElementById("userScriptsModalSubtitle").textContent = `Tổng cộng: ${data.total} kịch bản`;
+          
+          const listEl = document.getElementById("userScriptsList");
+          listEl.innerHTML = "";
+
+          if (data.scripts.length === 0) {
+            listEl.innerHTML = `
+              <div class="text-center py-8 text-slate-500">
+                <i class="fa-solid fa-file-lines text-4xl mb-2 opacity-50"></i>
+                <p class="text-sm">Người dùng này chưa có kịch bản nào</p>
+              </div>
+            `;
+          } else {
+            data.scripts.forEach((script, index) => {
+              const date = script.created_at ? new Date(script.created_at).toLocaleString("vi-VN") : "—";
+              const mode = script.mode === "transcript" ? "Chỉ Lấy Lời Thoại" : "Phân tích Chi Tiết";
+              
+              const div = document.createElement("div");
+              div.className = "glass-card rounded-xl p-4 border border-white/5";
+              div.innerHTML = `
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-1 rounded">#${index + 1}</span>
+                      <span class="text-xs text-slate-400">${mode}</span>
+                      <span class="text-xs text-slate-500">•</span>
+                      <span class="text-xs text-slate-400">${date}</span>
+                    </div>
+                    <a href="${script.video_url}" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 mb-2 block truncate">
+                      <i class="fa-solid fa-link"></i> ${script.video_url}
+                    </a>
+                    <div class="text-sm text-slate-300 line-clamp-3">${script.script_content.substring(0, 200)}${script.script_content.length > 200 ? '...' : ''}</div>
+                  </div>
+                  <button onclick="viewFullScript(${script.id})" class="text-xs text-purple-400 hover:text-purple-300 px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition">
+                    <i class="fa-solid fa-eye"></i> Xem đầy đủ
+                  </button>
+                </div>
+              `;
+              listEl.appendChild(div);
+            });
+          }
+
+          document.getElementById("userScriptsModal").classList.remove("hidden");
+        } catch (e) {
+          alert(e.message);
+        }
+      }
+
+      function viewFullScript(scriptId) {
+        alert("Tính năng xem đầy đủ sẽ được hiển thị trong modal riêng");
+      }
+
+      // Đóng modal khi click vào nút đóng
+      document.getElementById("closeUserScriptsModal").onclick = () => {
+        document.getElementById("userScriptsModal").classList.add("hidden");
+      };
+
+      // Đóng modal khi click vào background (overlay)
+      document.getElementById("userScriptsModal").onclick = (e) => {
+        if (e.target.id === "userScriptsModal") {
+          document.getElementById("userScriptsModal").classList.add("hidden");
+        }
+      };
+
+      // Đóng modal khi nhấn phím ESC
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !document.getElementById("userScriptsModal").classList.contains("hidden")) {
+          document.getElementById("userScriptsModal").classList.add("hidden");
+        }
+      });
+
+      // --- TRANSLATE FEATURE ---
+      const languages = [
+        { code: "en", name: "English", native: "English", flag: "🇬🇧" },
+        { code: "zh", name: "Chinese", native: "中文", flag: "🇨🇳" },
+        { code: "ja", name: "Japanese", native: "日本語", flag: "🇯🇵" },
+        { code: "ko", name: "Korean", native: "한국어", flag: "🇰🇷" },
+        { code: "th", name: "Thai", native: "ไทย", flag: "🇹🇭" },
+        { code: "id", name: "Indonesian", native: "Bahasa Indonesia", flag: "🇮🇩" },
+        { code: "ms", name: "Malay", native: "Bahasa Melayu", flag: "🇲🇾" },
+        { code: "es", name: "Spanish", native: "Español", flag: "🇪🇸" },
+        { code: "fr", name: "French", native: "Français", flag: "🇫🇷" },
+        { code: "de", name: "German", native: "Deutsch", flag: "🇩🇪" },
+        { code: "it", name: "Italian", native: "Italiano", flag: "🇮🇹" },
+        { code: "pt", name: "Portuguese", native: "Português", flag: "🇵🇹" },
+        { code: "ru", name: "Russian", native: "Русский", flag: "🇷🇺" },
+        { code: "ar", name: "Arabic", native: "العربية", flag: "🇸🇦" },
+        { code: "hi", name: "Hindi", native: "हिन्दी", flag: "🇮🇳" },
+        { code: "tr", name: "Turkish", native: "Türkçe", flag: "🇹🇷" },
+        { code: "nl", name: "Dutch", native: "Nederlands", flag: "🇳🇱" },
+        { code: "pl", name: "Polish", native: "Polski", flag: "🇵🇱" },
+        { code: "sv", name: "Swedish", native: "Svenska", flag: "🇸🇪" },
+        { code: "da", name: "Danish", native: "Dansk", flag: "🇩🇰" },
+        { code: "no", name: "Norwegian", native: "Norsk", flag: "🇳🇴" },
+        { code: "fi", name: "Finnish", native: "Suomi", flag: "🇫🇮" },
+        { code: "cs", name: "Czech", native: "Čeština", flag: "🇨🇿" },
+        { code: "hu", name: "Hungarian", native: "Magyar", flag: "🇭🇺" },
+        { code: "ro", name: "Romanian", native: "Română", flag: "🇷🇴" },
+        { code: "el", name: "Greek", native: "Ελληνικά", flag: "🇬🇷" },
+        { code: "he", name: "Hebrew", native: "עברית", flag: "🇮🇱" },
+        { code: "vi", name: "Vietnamese", native: "Tiếng Việt", flag: "🇻🇳" }
+      ];
+
+      let selectedLanguage = null;
+
+      function renderLanguages(filter = "") {
+        const filtered = languages.filter(lang => {
+          const search = filter.toLowerCase();
+          return lang.name.toLowerCase().includes(search) || 
+                 lang.native.toLowerCase().includes(search) ||
+                 lang.code.toLowerCase().includes(search);
+        });
+
+        UI.translateModal.list.innerHTML = "";
+
+        if (filtered.length === 0) {
+          UI.translateModal.list.innerHTML = `
+            <div class="col-span-full text-center py-8 text-slate-500">
+              <i class="fa-solid fa-magnifying-glass text-2xl mb-2 opacity-50"></i>
+              <p class="text-sm">Không tìm thấy ngôn ngữ</p>
+            </div>
+          `;
+          return;
+        }
+
+        filtered.forEach(lang => {
+          const div = document.createElement("div");
+          div.className = `glass-card rounded-xl p-3 cursor-pointer transition-all border-2 ${
+            selectedLanguage?.code === lang.code 
+              ? 'border-purple-500 bg-purple-500/10' 
+              : 'border-transparent hover:border-white/10'
+          }`;
+          
+          div.innerHTML = `
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">${lang.flag}</span>
+              <div class="flex-1">
+                <div class="text-sm font-bold text-white">${lang.native}</div>
+                <div class="text-xs text-slate-400">${lang.name}</div>
+              </div>
+              ${selectedLanguage?.code === lang.code ? '<i class="fa-solid fa-check text-purple-400"></i>' : ''}
+            </div>
+          `;
+
+          div.onclick = () => {
+            selectedLanguage = lang;
+            renderLanguages(UI.translateModal.search.value);
+            UI.translateModal.selected.textContent = `Đã chọn: ${lang.flag} ${lang.native}`;
+            UI.btns.confirmTranslate.disabled = false;
+          };
+
+          UI.translateModal.list.appendChild(div);
+        });
+      }
+
+      UI.btns.translate.onclick = () => {
+        if (!UI.result.output.value) {
+          alert("Chưa có kịch bản để dịch");
+          return;
+        }
+        selectedLanguage = null;
+        UI.translateModal.search.value = "";
+        UI.translateModal.selected.textContent = "Chưa chọn ngôn ngữ";
+        UI.btns.confirmTranslate.disabled = true;
+        renderLanguages();
+        UI.translateModal.modal.classList.remove("hidden");
+      };
+
+      UI.btns.closeTranslateModal.onclick = () => {
+        UI.translateModal.modal.classList.add("hidden");
+      };
+
+      UI.btns.cancelTranslate.onclick = () => {
+        UI.translateModal.modal.classList.add("hidden");
+      };
+
+      UI.translateModal.search.addEventListener("input", (e) => {
+        renderLanguages(e.target.value);
+      });
+
+      UI.btns.confirmTranslate.onclick = async () => {
+        if (!selectedLanguage || !UI.result.output.value) return;
+
+        // Luôn dịch từ bản gốc tiếng Việt
+        const textToTranslate = window.originalScript || UI.result.output.value;
+        if (!textToTranslate) {
+          alert("Không có nội dung để dịch");
+          return;
+        }
+
+        UI.btns.confirmTranslate.disabled = true;
+        UI.btns.confirmTranslate.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang dịch...';
+
+        // Hiển thị loading modal
+        showLoadingModal("Đang dịch kịch bản", [
+          { text: "Đang xử lý ngôn ngữ...", icon: "fa-language" },
+          { text: "Đang dịch nội dung...", icon: "fa-arrows-rotate" },
+          { text: "Đang hoàn thiện...", icon: "fa-check-double" }
+        ]);
+
+        try {
+          currentProgress = 0;
+          
+          // Bước 1: Xử lý ngôn ngữ (0% -> 30%)
+          await animateProgressTo(30, "Đang xử lý ngôn ngữ...", 1200);
+          
+          // Bước 2: Dịch nội dung (30% -> 70%)
+          await animateProgressTo(70, "Đang dịch nội dung...", 2000);
+          
+          // Bắt đầu tăng progress chậm trong khi chờ response
+          startSlowProgress(90);
+          
+          let res;
+          try {
+            res = await fetch(`${API_BASE}/api/translate`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${auth.getToken()}`
+              },
+              body: JSON.stringify({
+                text: textToTranslate, // Luôn dịch từ bản gốc tiếng Việt
+                target_language: selectedLanguage.code,
+                language_name: selectedLanguage.native
+              })
+            });
+          } catch (fetchError) {
+            stopSlowProgress();
+            hideLoadingModal();
+            throw new Error("Lỗi kết nối đến server. Vui lòng thử lại.");
+          }
+
+          // Dừng slow progress và tiếp tục với progress thực tế
+          stopSlowProgress();
+          
+          // Kiểm tra lỗi trước khi parse JSON
+          if (res.status === 401) {
+            hideLoadingModal();
+            auth.clear();
+            checkState();
+            throw new Error("Hết phiên đăng nhập");
+          }
+          
+          let data;
+          try {
+            data = await res.json();
+          } catch (jsonError) {
+            hideLoadingModal();
+            throw new Error("Lỗi xử lý dữ liệu từ server");
+          }
+          
+          if (!res.ok) {
+            hideLoadingModal();
+            throw new Error(data.error || "Lỗi dịch thuật");
+          }
+          
+          // Bước 3: Hoàn thiện (từ currentProgress -> 95%)
+          await animateProgressTo(95, "Đang hoàn thiện...", 1000);
+
+          // Hoàn thành (95% -> 100%)
+          await animateProgressTo(100, "Hoàn thành!", 500);
+          await sleep(500);
+
+          // Hiển thị kết quả dịch (giữ nguyên bản gốc tiếng Việt trong window.originalScript)
+          UI.result.output.value = data.translated_text;
+          // Không cập nhật window.originalScript - giữ nguyên bản gốc tiếng Việt
+          window.showTimestamps = true; // Reset timestamp toggle
+          updateTimestampButton();
+
+          // Cập nhật badge
+          UI.result.stats.tone.textContent = `${selectedLanguage.flag} ${selectedLanguage.code.toUpperCase()}`;
+          UI.translateModal.modal.classList.add("hidden");
+
+          hideLoadingModal();
+          alert(`✅ Đã dịch sang ${selectedLanguage.native} thành công!`);
+
+        } catch (e) {
+          // Đảm bảo dừng tất cả animation và đóng modal
+          stopSlowProgress();
+          hideLoadingModal();
+          // Đợi một chút để modal đóng hoàn toàn trước khi hiển thị alert
+          await sleep(300);
+          alert(e.message);
+        } finally {
+          UI.btns.confirmTranslate.disabled = false;
+          UI.btns.confirmTranslate.innerHTML = '<i class="fa-solid fa-language"></i> Dịch ngay';
+        }
+      };
+
+      // --- HOME LOGO CLICK ---
+      document.getElementById("homeLogo").onclick = () => {
+        // Reset về trạng thái ban đầu
+        if (UI.appView && !UI.appView.classList.contains("hidden")) {
+          // Nếu đang ở app view, reset form và result
+          UI.inputs.url.value = "";
+          UI.result.output.value = "";
+          UI.result.section.classList.add("hidden");
+          UI.result.empty.classList.remove("hidden");
+          window.originalScript = null;
+          window.showTimestamps = true;
+          updateTimestampButton();
+        } else {
+          // Nếu đang ở auth view, reload trang
+          window.location.reload();
+        }
+      };
+
+      // --- LOADING MODAL FUNCTIONS ---
+      function showLoadingModal(title, steps = []) {
+        const modal = document.getElementById("loadingModal");
+        const titleEl = document.getElementById("loadingTitle");
+        const stepsEl = document.getElementById("loadingSteps");
+        
+        titleEl.textContent = title;
+        stepsEl.innerHTML = "";
+        
+        steps.forEach((step, index) => {
+          const stepDiv = document.createElement("div");
+          stepDiv.className = "flex items-center gap-2 text-xs text-slate-400";
+          stepDiv.id = `step-${index}`;
+          stepDiv.innerHTML = `
+            <i class="fa-solid ${step.icon} w-4 text-center"></i>
+            <span>${step.text}</span>
+            <i class="fa-solid fa-spinner fa-spin ml-auto text-purple-400 hidden" id="step-spinner-${index}"></i>
+            <i class="fa-solid fa-check ml-auto text-green-400 hidden" id="step-check-${index}"></i>
+          `;
+          stepsEl.appendChild(stepDiv);
+        });
+        
+        currentProgress = 0;
+        updateLoadingProgress(0);
+        modal.classList.remove("hidden");
+      }
+
+      let currentProgress = 0;
+      let progressAnimationId = null;
+      let slowProgressInterval = null;
+
+      function updateLoadingProgress(percent, currentStep = null) {
+        const circle = document.getElementById("progressCircle");
+        const percentEl = document.getElementById("loadingPercent");
+        const subtitleEl = document.getElementById("loadingSubtitle");
+        
+        if (circle && percentEl) {
+          const circumference = 2 * Math.PI * 56; // radius = 56
+          const offset = circumference - (percent / 100) * circumference;
+          
+          circle.style.strokeDashoffset = offset;
+          percentEl.textContent = Math.round(percent);
+        }
+        
+        if (currentStep && subtitleEl) {
+          subtitleEl.textContent = currentStep;
+        }
+        
+        // Update step indicators
+        const steps = document.querySelectorAll("#loadingSteps > div");
+        const activeIndex = Math.floor((percent / 100) * steps.length);
+        
+        steps.forEach((step, index) => {
+          const spinner = step.querySelector(`#step-spinner-${index}`);
+          const check = step.querySelector(`#step-check-${index}`);
+          
+          if (index < activeIndex) {
+            // Completed
+            if (spinner) spinner.classList.add("hidden");
+            if (check) {
+              check.classList.remove("hidden");
+              step.classList.remove("text-slate-400");
+              step.classList.add("text-green-400");
+            }
+          } else if (index === activeIndex && percent > 0) {
+            // Active
+            if (spinner) spinner.classList.remove("hidden");
+            if (check) check.classList.add("hidden");
+            step.classList.remove("text-slate-400");
+            step.classList.add("text-purple-400");
+          } else {
+            // Pending
+            if (spinner) spinner.classList.add("hidden");
+            if (check) check.classList.add("hidden");
+            step.classList.remove("text-green-400", "text-purple-400");
+            step.classList.add("text-slate-400");
+          }
+        });
+      }
+
+      // Hàm tăng progress từ từ
+      async function animateProgressTo(targetPercent, currentStep = null, duration = 2000) {
+        return new Promise((resolve) => {
+          if (progressAnimationId) {
+            clearInterval(progressAnimationId);
+          }
+          
+          const startPercent = currentProgress;
+          const difference = targetPercent - startPercent;
+          const steps = Math.max(1, Math.floor(duration / 50)); // Update mỗi 50ms
+          const increment = difference / steps;
+          let stepCount = 0;
+          
+          progressAnimationId = setInterval(() => {
+            stepCount++;
+            currentProgress = Math.min(startPercent + (increment * stepCount), targetPercent);
+            
+            updateLoadingProgress(currentProgress, currentStep);
+            
+            if (stepCount >= steps || currentProgress >= targetPercent) {
+              currentProgress = targetPercent;
+              updateLoadingProgress(currentProgress, currentStep);
+              clearInterval(progressAnimationId);
+              progressAnimationId = null;
+              resolve();
+            }
+          }, 50);
+        });
+      }
+
+      // Hàm tăng progress chậm khi đang chờ (để không bị đứng yên)
+      function startSlowProgress(maxPercent = 95) {
+        if (slowProgressInterval) {
+          clearInterval(slowProgressInterval);
+        }
+        
+        slowProgressInterval = setInterval(() => {
+          if (currentProgress < maxPercent) {
+            currentProgress += 0.5; // Tăng 0.5% mỗi 200ms
+            updateLoadingProgress(currentProgress);
+          } else {
+            clearInterval(slowProgressInterval);
+            slowProgressInterval = null;
+          }
+        }, 200);
+      }
+
+      function stopSlowProgress() {
+        if (slowProgressInterval) {
+          clearInterval(slowProgressInterval);
+          slowProgressInterval = null;
+        }
+      }
+
+      function hideLoadingModal() {
+        const modal = document.getElementById("loadingModal");
+        if (modal) {
+          if (progressAnimationId) {
+            clearInterval(progressAnimationId);
+            progressAnimationId = null;
+          }
+          stopSlowProgress();
+          currentProgress = 0;
+          modal.classList.add("hidden");
+          updateLoadingProgress(0);
+        }
+      }
+
+      function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      // Start
+      checkState();
+    </script>
+  </body>
+</html>

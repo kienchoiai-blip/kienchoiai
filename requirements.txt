@@ -1,0 +1,8 @@
+flask
+flask-cors
+flask-sqlalchemy
+yt-dlp
+google-generativeai
+werkzeug
+gunicorn
+
