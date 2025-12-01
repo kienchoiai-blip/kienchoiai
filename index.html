@@ -820,6 +820,23 @@
           return;
         }
 
+        // Kiểm tra URL hợp lệ - không cho phép URL của chính ứng dụng
+        const currentOrigin = window.location.origin;
+        if (url.includes(currentOrigin) || url.includes('onrender.com') || url.includes('railway.app')) {
+          alert("⚠️ Vui lòng nhập link video từ Facebook, TikTok, Instagram hoặc YouTube!\n\nLink bạn nhập là link của trang web, không phải link video.");
+          UI.inputs.url.focus();
+          return;
+        }
+
+        // Kiểm tra URL có phải là link video hợp lệ
+        const validPlatforms = ['facebook.com', 'fb.watch', 'tiktok.com', 'instagram.com', 'youtube.com', 'youtu.be'];
+        const isValidUrl = validPlatforms.some(platform => url.toLowerCase().includes(platform));
+        if (!isValidUrl) {
+          alert("⚠️ Link không hợp lệ!\n\nVui lòng nhập link video từ:\n• Facebook (facebook.com, fb.watch)\n• TikTok (tiktok.com)\n• Instagram (instagram.com)\n• YouTube (youtube.com, youtu.be)");
+          UI.inputs.url.focus();
+          return;
+        }
+
         const mode = document.querySelector('input[name="scriptMode"]:checked').value;
         
         UI.btns.generate.disabled = true;

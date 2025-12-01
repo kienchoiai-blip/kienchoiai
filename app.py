@@ -123,6 +123,22 @@ with app.app_context():
 
 def download_video(url: str) -> str:
     print(f"⬇️ Đang tải video: {url}")
+    
+    # Kiểm tra URL không phải là domain của chính ứng dụng
+    import re
+    if re.search(r'(onrender\.com|railway\.app|localhost|127\.0\.0\.1)', url, re.IGNORECASE):
+        raise RuntimeError(
+            "⚠️ Link không hợp lệ!\n\n"
+            "Bạn đang nhập link của trang web, không phải link video.\n\n"
+            "💡 Vui lòng:\n"
+            "• Copy link video trực tiếp từ Facebook, TikTok, Instagram hoặc YouTube\n"
+            "• Link video thường có dạng:\n"
+            "  - Facebook: https://www.facebook.com/watch/?v=...\n"
+            "  - TikTok: https://www.tiktok.com/@.../video/...\n"
+            "  - Instagram: https://www.instagram.com/reel/...\n"
+            "  - YouTube: https://www.youtube.com/watch?v=..."
+        )
+    
     temp_name = f"video_{int(time.time())}.mp4"
     
     # Nếu là Instagram, thử nhiều phương pháp
@@ -137,6 +153,8 @@ def download_video(url: str) -> str:
                 'no_warnings': True,
                 'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
                 'referer': 'https://www.instagram.com/',
+                'socket_timeout': 60,  # Tăng timeout cho Render free tier
+                'http_chunk_size': 10485760,
                 'http_headers': {
                     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
                     'Accept': '*/*',
@@ -159,6 +177,8 @@ def download_video(url: str) -> str:
                 'no_warnings': True,
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'referer': 'https://www.instagram.com/',
+                'socket_timeout': 60,
+                'http_chunk_size': 10485760,
             },
             {
                 'outtmpl': temp_name,
@@ -168,6 +188,8 @@ def download_video(url: str) -> str:
                 'no_warnings': True,
                 'user_agent': 'Instagram 219.0.0.12.117 Android',
                 'referer': 'https://www.instagram.com/',
+                'socket_timeout': 60,
+                'http_chunk_size': 10485760,
             }
         ]
         
@@ -196,6 +218,7 @@ def download_video(url: str) -> str:
         )
     
     # Cấu hình yt-dlp cho các nền tảng khác
+    # Tăng timeout cho Render free tier (có thể chậm)
     ydl_opts = {
         'outtmpl': temp_name,
         'format': 'best[ext=mp4]/best',
@@ -210,6 +233,9 @@ def download_video(url: str) -> str:
         'retries': 3,
         'fragment_retries': 3,
         'ignoreerrors': False,
+        # Tăng timeout cho Render free tier (mặc định 20s, tăng lên 60s)
+        'socket_timeout': 60,
+        'http_chunk_size': 10485760,  # 10MB chunks
     }
     
     try:
