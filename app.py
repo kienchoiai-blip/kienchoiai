@@ -248,13 +248,65 @@ def download_video(url: str) -> str:
         raise RuntimeError(f"Lỗi tải video: {error_msg}")
 
 def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
+    # Kiểm tra kích thước file trước khi upload
+    file_size = os.path.getsize(video_path)
+    file_size_mb = file_size / (1024 * 1024)
+    print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
+    
+    # Gemini API giới hạn: 2GB (nhưng thực tế nên < 100MB để tránh timeout)
+    if file_size_mb > 100:
+        raise RuntimeError(
+            f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
+            "💡 Giải pháp:\n"
+            "• Video nên nhỏ hơn 100MB để xử lý nhanh\n"
+            "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
+            "• Gemini API có thể từ chối file quá lớn"
+        )
+    
     print("🚀 Đang gửi video lên AI...")
-    uploaded_file = genai.upload_file(video_path)
-    while True:
-        file = genai.get_file(uploaded_file.name)
-        if file.state.name == "ACTIVE": break
-        if file.state.name == "FAILED": raise RuntimeError("Google từ chối file.")
-        time.sleep(2)
+    try:
+        uploaded_file = genai.upload_file(
+            video_path,
+            display_name=f"video_{int(time.time())}"
+        )
+        
+        # Đợi file được xử lý (tối đa 2 phút)
+        max_wait = 120  # 2 phút
+        waited = 0
+        while waited < max_wait:
+            file = genai.get_file(uploaded_file.name)
+            if file.state.name == "ACTIVE":
+                print("✅ File đã được upload thành công")
+                break
+            if file.state.name == "FAILED":
+                error_msg = "Google từ chối file."
+                # Thử lấy thông tin lỗi chi tiết nếu có
+                try:
+                    if hasattr(file, 'error') and file.error:
+                        error_msg += f"\nChi tiết: {file.error}"
+                except:
+                    pass
+                raise RuntimeError(error_msg)
+            time.sleep(2)
+            waited += 2
+            print(f"⏳ Đang chờ Google xử lý file... ({waited}s/{max_wait}s)")
+        
+        if waited >= max_wait:
+            raise RuntimeError("Timeout: Google xử lý file quá lâu. Vui lòng thử lại với video ngắn hơn.")
+            
+    except Exception as e:
+        error_msg = str(e)
+        if "rejected" in error_msg.lower() or "failed" in error_msg.lower():
+            raise RuntimeError(
+                "⚠️ Google từ chối file video.\n\n"
+                "💡 Nguyên nhân có thể:\n"
+                "• File quá lớn (>100MB)\n"
+                "• Format không được hỗ trợ\n"
+                "• Video quá dài\n"
+                "• Nội dung vi phạm chính sách\n\n"
+                f"Chi tiết: {error_msg[:200]}"
+            )
+        raise
 
     print(f"✍️ Đang viết kịch bản (mode={mode})...")
     model = genai.GenerativeModel(CHOSEN_MODEL)
