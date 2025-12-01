@@ -144,7 +144,7 @@
             <div>
               <h1 class="font-display font-bold text-xl tracking-tight text-white leading-none">
                 <span class="text-gradient">ViE</span><span class="text-white">SCRIPT</span>
-              </h1>
+        </h1>
               <p class="text-[10px] text-slate-500 font-medium tracking-widest uppercase mt-0.5">Studio Kịch Bản AI</p>
             </div>
           </div>
@@ -238,9 +238,9 @@
                       class="custom-input w-full rounded-xl py-3 px-4 text-sm text-white placeholder-slate-600" 
                       placeholder="TikTok, Reels, Shorts..." />
                     <div class="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 text-lg opacity-30 pointer-events-none">
-                      <i class="fa-brands fa-tiktok platform-icon" data-platform="tiktok"></i>
-                      <i class="fa-brands fa-instagram platform-icon" data-platform="instagram"></i>
-                      <i class="fa-brands fa-facebook platform-icon" data-platform="facebook"></i>
+            <i class="fa-brands fa-tiktok platform-icon" data-platform="tiktok"></i>
+            <i class="fa-brands fa-instagram platform-icon" data-platform="instagram"></i>
+            <i class="fa-brands fa-facebook platform-icon" data-platform="facebook"></i>
                     </div>
                   </div>
                 </div>
@@ -275,8 +275,8 @@
                         peer-checked:bg-blue-500 peer-checked:border-white 
                         flex items-center justify-center transition-all duration-300 transform peer-checked:scale-100 scale-0">
                         <i class="fa-solid fa-check text-white text-[10px]"></i>
-                      </div>
-                    </label>
+          </div>
+        </label>
 
                     <label class="relative rounded-xl p-4 cursor-pointer group flex items-center gap-3 transition-all duration-300 
                       bg-dark-800/40 border-2 border-slate-700/50
@@ -290,7 +290,7 @@
                         peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-purple-500/50
                         transition-all duration-300 transform peer-checked:scale-110">
                         <i class="fa-solid fa-closed-captioning text-sm"></i>
-                      </div>
+        </div>
                       <div class="flex-1">
                         <div class="flex items-center gap-2">
                           <span class="block text-sm font-bold text-slate-200 peer-checked:text-white transition-colors">Chỉ Lấy Lời Thoại</span>
@@ -313,7 +313,7 @@
                   <i class="fa-solid fa-bolt text-yellow-300"></i>
                   <span class="btn-label">Tạo Kịch Bản Ngay</span>
                   <span id="spinner" class="hidden spinner w-4 h-4 border-2"></span>
-                </button>
+        </button>
               </div>
             </div>
 
@@ -409,13 +409,13 @@
             </div>
           </div>
 
-        </section>
+      </section>
 
         <!-- ADMIN PANEL -->
         <section id="adminPanel" class="hidden animate-fade-in">
           <div class="space-y-6">
             <!-- Header -->
-            <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between">
               <div>
                 <h2 class="text-2xl font-bold text-white flex items-center gap-3">
                   <i class="fa-solid fa-shield-halved text-purple-400"></i>
@@ -425,13 +425,13 @@
               </div>
               <button id="closeAdminPanel" class="text-slate-400 hover:text-white transition">
                 <i class="fa-solid fa-times text-xl"></i>
-              </button>
-            </div>
+          </button>
+        </div>
 
             <!-- Stats Cards -->
             <div id="adminStats" class="grid grid-cols-1 md:grid-cols-4 gap-4">
               <!-- Stats will be loaded here -->
-            </div>
+          </div>
 
             <!-- Users Table -->
             <div class="glass rounded-3xl border border-white/5 overflow-hidden">
@@ -443,7 +443,7 @@
                 <button id="refreshUsersBtn" class="text-xs bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded-lg transition font-medium flex items-center gap-2 border border-white/5">
                   <i class="fa-solid fa-arrow-rotate-right"></i> Làm mới
                 </button>
-              </div>
+          </div>
 
               <div class="overflow-x-auto">
                 <table class="w-full">
@@ -462,9 +462,9 @@
                   </tbody>
                 </table>
               </div>
-            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
         <!-- USER SCRIPTS MODAL -->
         <div id="userScriptsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -591,11 +591,12 @@
           </div>
         </div>
 
-      </main>
+    </main>
     </div>
 
     <script>
       // --- CONFIG ---
+      // Tự động detect API URL: dùng origin hiện tại (hoạt động trên mọi thiết bị và domain)
       const API_BASE = window.location.origin;
       const TOKEN_KEY = "athena_token";
       const USER_KEY = "athena_username";
@@ -742,7 +743,7 @@
           });
           auth.save(data.token, data.username, isAdmin);
           // Đợi một chút để đảm bảo localStorage đã được lưu
-          setTimeout(() => {
+        setTimeout(() => {
             checkState();
           }, 100);
         } catch (e) {

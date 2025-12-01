@@ -11,9 +11,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
 
 # ==========================================
-# 🔑 KEY CỦA BẠN (Đã điền sẵn)
-MY_API_KEY = "AIzaSyCK3CI7Z3FEap9MCMxRFjAPWOcvekzTlTA"
+# 🔑 API KEY - Ưu tiên environment variable, fallback về hardcoded cho local dev
+MY_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCK3CI7Z3FEap9MCMxRFjAPWOcvekzTlTA")
 # ==========================================
+
+if not MY_API_KEY or MY_API_KEY == "":
+    raise ValueError("GEMINI_API_KEY không được tìm thấy! Vui lòng set environment variable GEMINI_API_KEY")
 
 genai.configure(api_key=MY_API_KEY)
 
@@ -526,8 +529,10 @@ def api_translate():
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 5000))
-        print(f"🚀 Đang khởi động server trên port {port}...")
-        app.run(host="0.0.0.0", port=port, debug=True)
+        # Tắt debug mode trong production (chỉ bật khi có DEBUG=true)
+        debug_mode = os.environ.get("DEBUG", "false").lower() == "true"
+        print(f"🚀 Đang khởi động server trên port {port}... (Debug: {debug_mode})")
+        app.run(host="0.0.0.0", port=port, debug=debug_mode)
     except Exception as e:
         print(f"❌ LỖI KHỞI ĐỘNG SERVER: {e}")
         import traceback
