@@ -34,7 +34,38 @@ app = Flask(__name__, static_folder=".", static_url_path="")
 # CORS: Cho phép mọi nguồn (đơn giản hóa tối đa để tránh lỗi)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///athena.db"
+# ==========================================
+# DATABASE CONFIGURATION - PostgreSQL hoặc SQLite
+# ==========================================
+# Trên Render: Sử dụng PostgreSQL (từ DATABASE_URL environment variable)
+# Local dev: Sử dụng SQLite (fallback nếu không có DATABASE_URL)
+# ==========================================
+
+# Lấy DATABASE_URL từ environment variable (Render tự động cung cấp)
+# Format: postgresql://user:password@host:port/database
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Nếu không có DATABASE_URL (local dev), dùng SQLite
+if not DATABASE_URL:
+    # Local development: Sử dụng SQLite
+    PERSISTENT_DIR = "/persistent" if os.path.exists("/persistent") else "."
+    DB_PATH = os.path.join(PERSISTENT_DIR, "athena.db")
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+    
+    # Tạo thư mục persistent nếu chưa có (cho local dev)
+    if PERSISTENT_DIR != "/persistent" and not os.path.exists(PERSISTENT_DIR):
+        os.makedirs(PERSISTENT_DIR, exist_ok=True)
+    
+    print(f"💾 Local dev: Sử dụng SQLite tại {DB_PATH}")
+else:
+    # Production: Sử dụng PostgreSQL
+    # Render tự động cung cấp DATABASE_URL cho PostgreSQL
+    print(f"💾 Production: Sử dụng PostgreSQL")
+    # Chuyển đổi postgres:// thành postgresql:// (cho SQLAlchemy)
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 

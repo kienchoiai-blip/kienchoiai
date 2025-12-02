@@ -5,4 +5,5 @@ yt-dlp
 google-generativeai
 werkzeug
 gunicorn
+psycopg2-binary
 
