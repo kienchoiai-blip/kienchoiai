@@ -2,6 +2,7 @@ import os
 import time
 import csv
 import re
+import gc  # Garbage collection để giải phóng memory
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -305,10 +306,12 @@ def download_video(url: str) -> str:
         )
     
     # Cấu hình yt-dlp cho các nền tảng khác
-    # Tăng timeout cho Render free tier (có thể chậm)
+    # Tối ưu cho Render free tier: download chất lượng thấp hơn để giảm kích thước file
+    # Ưu tiên video nhỏ hơn 20MB để tránh OOM
     ydl_opts = {
         'outtmpl': temp_name,
-        'format': 'best[ext=mp4]/best',
+        # Ưu tiên video chất lượng thấp hơn (720p hoặc thấp hơn) để giảm kích thước
+        'format': 'best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[ext=mp4]/best',
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
@@ -335,15 +338,17 @@ def download_video(url: str) -> str:
             file_size_mb = file_size / (1024 * 1024)
             print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
             
-            # Giới hạn 30MB cho Render free tier (512MB RAM)
-            if file_size_mb > 30:
+            # Giới hạn 20MB cho Render free tier (512MB RAM)
+            # Với 512MB RAM, cần dự trữ: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
+            # Video 20MB + overhead (~50MB) = ~70MB, tổng ~320MB, an toàn cho 512MB
+            if file_size_mb > 20:
                 os.remove(temp_name)  # Xóa ngay để giải phóng bộ nhớ
                 raise RuntimeError(
                     f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
                     "💡 Giải pháp:\n"
-                    "• Video nên nhỏ hơn 30MB để tránh lỗi bộ nhớ\n"
+                    "• Video nên nhỏ hơn 20MB để tránh lỗi bộ nhớ\n"
                     "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-                    "• Render free tier chỉ có 512MB RAM\n"
+                    "• Render free tier chỉ có 512MB RAM (rất hạn chế)\n"
                     "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
                 )
         
@@ -365,16 +370,16 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # Giảm giới hạn xuống 30MB cho Render free tier (512MB RAM)
-    # Với 512MB RAM, cần dự trữ cho Python, Flask, yt-dlp, và Gemini API
-    # 30MB video + overhead = ~100-150MB, an toàn hơn cho 512MB total
-    if file_size_mb > 30:
+    # Giới hạn 20MB cho Render free tier (512MB RAM)
+    # Với 512MB RAM, cần dự trữ: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
+    # Video 20MB + overhead (~50MB) = ~70MB, tổng ~320MB, an toàn cho 512MB
+    if file_size_mb > 20:
         raise RuntimeError(
             f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
             "💡 Giải pháp:\n"
-            "• Video nên nhỏ hơn 30MB để tránh lỗi bộ nhớ\n"
+            "• Video nên nhỏ hơn 20MB để tránh lỗi bộ nhớ\n"
             "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-            "• Render free tier chỉ có 512MB RAM (cần dự trữ cho hệ thống)\n"
+            "• Render free tier chỉ có 512MB RAM (rất hạn chế)\n"
             "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
         )
     
@@ -397,6 +402,8 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
                 if os.path.exists(video_path):
                     os.remove(video_path)
                     print("🗑️ Đã xóa file video để giải phóng bộ nhớ")
+                    # Force garbage collection để giải phóng memory ngay lập tức
+                    gc.collect()
                 break
             if file.state.name == "FAILED":
                 error_msg = "Google từ chối file."
@@ -426,7 +433,7 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             raise RuntimeError(
                 "⚠️ Google từ chối file video.\n\n"
                 "💡 Nguyên nhân có thể:\n"
-                "• File quá lớn (>30MB)\n"
+                "• File quá lớn (>20MB)\n"
                 "• Format không được hỗ trợ\n"
                 "• Video quá dài\n"
                 "• Nội dung vi phạm chính sách\n\n"
@@ -516,6 +523,8 @@ Ví dụ format:
                 print("🗑️ Đã xóa file từ Google")
             except:
                 pass
+        # Force garbage collection sau khi cleanup
+        gc.collect()
     
     return "Không có nội dung trả về."
 
