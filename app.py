@@ -116,11 +116,12 @@ def get_best_model_name():
                 "latest" not in m.lower() and "preview" not in m.lower()):
                 gemini_models.append(m)
         
-        # Nếu không có model nào phù hợp, thử lại với điều kiện lỏng hơn (chỉ loại 2.5, 2.0, gemma)
+        # Nếu không có model nào phù hợp, thử lại với điều kiện lỏng hơn (vẫn loại bỏ exp, latest)
         if not gemini_models:
             gemini_models = [m for m in available_models 
                            if "gemini" in m.lower() and "gemma" not in m.lower() 
-                           and "2.5" not in m and "2.0" not in m]
+                           and "2.5" not in m and "2.0" not in m
+                           and "exp" not in m.lower() and "latest" not in m.lower()]
         
         # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier, hỗ trợ video)
         for m in gemini_models:
@@ -140,12 +141,13 @@ def get_best_model_name():
                 print(f"✅ Chọn model: {m} (hỗ trợ video)")
                 return m
         
-        # Nếu vẫn còn model gemini trong danh sách, dùng model đầu tiên (đã loại bỏ latest)
+        # Nếu vẫn còn model gemini trong danh sách, dùng model đầu tiên (đã loại bỏ latest, exp)
         if gemini_models:
             selected = gemini_models[0]
-            # Đảm bảo cuối cùng: CHỈ dùng gemini, KHÔNG BAO GIỜ dùng gemma, 2.5, hoặc latest
-            if "gemma" in selected.lower() or "2.5" in selected or "latest" in selected.lower():
-                print(f"⚠️ Model {selected} không phù hợp (có gemma/2.5/latest), bỏ qua và dùng fallback")
+            # Đảm bảo cuối cùng: CHỈ dùng gemini, KHÔNG BAO GIỜ dùng gemma, 2.5, latest, hoặc exp
+            if ("gemma" in selected.lower() or "2.5" in selected or 
+                "latest" in selected.lower() or "exp" in selected.lower()):
+                print(f"⚠️ Model {selected} không phù hợp (có gemma/2.5/latest/exp), bỏ qua và dùng fallback")
             else:
                 print(f"✅ Dùng model gemini: {selected}")
                 return selected
