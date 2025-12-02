@@ -416,7 +416,9 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             try:
                 os.remove(video_path)
                 print("🗑️ Đã xóa file video ngay sau khi bắt đầu upload để giải phóng bộ nhớ")
-                gc.collect()  # Force garbage collection ngay lập tức
+                # Force garbage collection nhiều lần để đảm bảo giải phóng memory
+                gc.collect()
+                gc.collect()  # Gọi 2 lần để đảm bảo
             except Exception as e:
                 print(f"⚠️ Không thể xóa file ngay: {e}")
         
@@ -432,8 +434,11 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
                     try:
                         os.remove(video_path)
                         gc.collect()
+                        gc.collect()
                     except:
                         pass
+                # Force garbage collection sau khi upload thành công
+                gc.collect()
                 break
             if file.state.name == "FAILED":
                 error_msg = "Google từ chối file."
@@ -518,6 +523,8 @@ Ví dụ format:
             try:
                 response = model.generate_content([uploaded_file, prompt], safety_settings=safety)
                 result = response.text if response.text else "Không có nội dung trả về."
+                # Force garbage collection sau khi generate content để giải phóng memory
+                gc.collect()
                 return result
             except Exception as e:
                 error_msg = str(e)
@@ -553,7 +560,9 @@ Ví dụ format:
                 print("🗑️ Đã xóa file từ Google")
             except:
                 pass
-        # Force garbage collection sau khi cleanup
+        # Force garbage collection nhiều lần sau khi cleanup để giải phóng memory tối đa
+        gc.collect()
+        gc.collect()
         gc.collect()
     
     return "Không có nội dung trả về."
