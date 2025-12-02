@@ -41,7 +41,8 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # Local dev: Sử dụng SQLite (fallback nếu không có DATABASE_URL)
 # ==========================================
 
-# Lấy DATABASE_URL từ environment variable (Render tự động cung cấp)
+# Lấy DATABASE_URL từ environment variable
+# Trên Render: Phải dùng "Internal Database URL" (không phải External)
 # Format: postgresql://user:password@host:port/database
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -59,11 +60,37 @@ if not DATABASE_URL:
     print(f"💾 Local dev: Sử dụng SQLite tại {DB_PATH}")
 else:
     # Production: Sử dụng PostgreSQL
-    # Render tự động cung cấp DATABASE_URL cho PostgreSQL
     print(f"💾 Production: Sử dụng PostgreSQL")
+    
     # Chuyển đổi postgres:// thành postgresql:// (cho SQLAlchemy)
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    # Kiểm tra và sửa Internal URL nếu cần
+    # Render Internal URLs phải có .render.internal trong hostname
+    if "dpg-" in DATABASE_URL:
+        # Nếu hostname không có .render.internal, thêm vào
+        import re
+        # Pattern: postgresql://user:pass@dpg-xxx-a:5432/dbname
+        # Cần thành: postgresql://user:pass@dpg-xxx-a.render.internal:5432/dbname
+        pattern = r'@(dpg-[^:]+):(\d+)'
+        match = re.search(pattern, DATABASE_URL)
+        if match and '.render.internal' not in DATABASE_URL:
+            hostname = match.group(1)
+            port = match.group(2)
+            # Thay thế hostname ngắn bằng hostname đầy đủ với .render.internal
+            DATABASE_URL = DATABASE_URL.replace(f'@{hostname}:{port}', f'@{hostname}.render.internal:{port}')
+            print(f"✅ Đã tự động sửa Internal Database URL")
+        elif '.render.internal' in DATABASE_URL:
+            print(f"✅ Đang dùng Internal Database URL (đúng)")
+        else:
+            print(f"⚠️ Cảnh báo: Không thể tự động sửa URL. Vui lòng dùng Internal Database URL từ Render!")
+    
+    # Log một phần URL để debug (không log password)
+    url_parts = DATABASE_URL.split('@')
+    if len(url_parts) > 1:
+        safe_url = url_parts[0] + '@' + url_parts[1].split('/')[0] + '/...'
+        print(f"💾 DATABASE_URL: {safe_url}")
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -78,16 +105,28 @@ def get_best_model_name():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
+        # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, không dùng gemini-2.5-pro)
         for m in available_models:
-            if "gemini-1.5-flash" in m: return m
+            if "gemini-1.5-flash" in m and "2.5" not in m: 
+                print(f"✅ Chọn model: {m} (tốt nhất cho free tier)")
+                return m
         for m in available_models:
-            if "gemini-1.5-pro" in m: return m
+            if "gemini-1.5-pro" in m and "2.5" not in m: 
+                print(f"✅ Chọn model: {m}")
+                return m
         for m in available_models:
-            if "gemini-pro" in m: return m
+            if "gemini-pro" in m and "2.5" not in m: 
+                print(f"✅ Chọn model: {m}")
+                return m
             
-        if available_models: return available_models[0]
+        if available_models: 
+            print(f"⚠️ Dùng model đầu tiên tìm được: {available_models[0]}")
+            return available_models[0]
     except Exception as e:
         print(f"⚠️ Lỗi quét model: {e}")
+    
+    # Fallback: Dùng gemini-1.5-flash (không dùng 2.5-pro vì quota thấp)
+    print("✅ Fallback: Dùng gemini-1.5-flash")
     return "models/gemini-1.5-flash"
 
 CHOSEN_MODEL = get_best_model_name()
@@ -386,8 +425,44 @@ Ví dụ format:
               {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
               {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
     
-    response = model.generate_content([uploaded_file, prompt], safety_settings=safety)
-    return response.text if response.text else "Không có nội dung trả về."
+    # Retry logic cho rate limit (429)
+    max_retries = 3
+    retry_delay = 5  # giây
+    
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content([uploaded_file, prompt], safety_settings=safety)
+            return response.text if response.text else "Không có nội dung trả về."
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Kiểm tra rate limit (429)
+            if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    # Tìm thời gian retry từ error message
+                    import re
+                    retry_match = re.search(r'retry in (\d+\.?\d*)s', error_msg, re.IGNORECASE)
+                    if retry_match:
+                        retry_delay = int(float(retry_match.group(1))) + 2
+                    
+                    print(f"⏳ Rate limit! Đợi {retry_delay}s trước khi thử lại (lần {attempt + 1}/{max_retries})...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    raise RuntimeError(
+                        "⚠️ Đã vượt quá quota của Google Gemini API (free tier).\n\n"
+                        "💡 Giải pháp:\n"
+                        "• Đợi vài phút rồi thử lại\n"
+                        "• Hoặc nâng cấp API key lên paid plan\n"
+                        "• Free tier có giới hạn số requests mỗi phút\n\n"
+                        f"Chi tiết: {error_msg[:200]}"
+                    )
+            else:
+                # Lỗi khác, không retry
+                raise
+    
+    return "Không có nội dung trả về."
 
 # --- AUTH HELPERS ---
 def get_current_user():
@@ -630,8 +705,40 @@ def api_translate():
                   {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
                   {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
         
-        response = model.generate_content([prompt], safety_settings=safety)
-        translated_text = response.text if response.text else text
+        # Retry logic cho rate limit (429)
+        max_retries = 3
+        retry_delay = 5
+        
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content([prompt], safety_settings=safety)
+                translated_text = response.text if response.text else text
+                break
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Kiểm tra rate limit (429)
+                if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        import re
+                        retry_match = re.search(r'retry in (\d+\.?\d*)s', error_msg, re.IGNORECASE)
+                        if retry_match:
+                            retry_delay = int(float(retry_match.group(1))) + 2
+                        
+                        print(f"⏳ Rate limit! Đợi {retry_delay}s trước khi thử lại (lần {attempt + 1}/{max_retries})...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    else:
+                        raise RuntimeError(
+                            "⚠️ Đã vượt quá quota của Google Gemini API (free tier).\n\n"
+                            "💡 Giải pháp:\n"
+                            "• Đợi vài phút rồi thử lại\n"
+                            "• Hoặc nâng cấp API key lên paid plan\n\n"
+                            f"Chi tiết: {error_msg[:200]}"
+                        )
+                else:
+                    raise
         
         print(f"✅ Đã dịch xong")
         
