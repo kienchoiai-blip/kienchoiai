@@ -106,17 +106,18 @@ def get_best_model_name():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
-        # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, KHÔNG BAO GIỜ dùng gemini-2.5-pro)
-        # Loại bỏ HOÀN TOÀN các model 2.5 và latest (tốn nhiều memory và quota thấp)
+        # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, KHÔNG BAO GIỜ dùng gemini-2.5-pro, 2.0, exp)
+        # Loại bỏ HOÀN TOÀN các model 2.5, 2.0, exp, latest, preview (tốn nhiều memory và quota thấp)
         filtered_models = []
         for m in available_models:
-            # Loại bỏ: 2.5, latest, preview (trừ khi là 1.5)
-            if "2.5" not in m and "latest" not in m.lower() and "preview" not in m.lower():
+            # Loại bỏ: 2.5, 2.0, exp, latest, preview (chỉ dùng 1.5 để ổn định)
+            if ("2.5" not in m and "2.0" not in m and "exp" not in m.lower() and 
+                "latest" not in m.lower() and "preview" not in m.lower()):
                 filtered_models.append(m)
         
-        # Nếu không có model nào phù hợp, thử lại với điều kiện lỏng hơn (chỉ loại 2.5)
+        # Nếu không có model nào phù hợp, thử lại với điều kiện lỏng hơn (chỉ loại 2.5 và 2.0)
         if not filtered_models:
-            filtered_models = [m for m in available_models if "2.5" not in m]
+            filtered_models = [m for m in available_models if "2.5" not in m and "2.0" not in m]
         
         # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier)
         for m in filtered_models:
