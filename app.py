@@ -106,11 +106,19 @@ def get_best_model_name():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
-        # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, không dùng gemini-2.5-pro)
-        # Loại bỏ các model không phù hợp trước
-        filtered_models = [m for m in available_models if "2.5" not in m and "latest" not in m.lower()]
+        # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, KHÔNG BAO GIỜ dùng gemini-2.5-pro)
+        # Loại bỏ HOÀN TOÀN các model 2.5 và latest (tốn nhiều memory và quota thấp)
+        filtered_models = []
+        for m in available_models:
+            # Loại bỏ: 2.5, latest, preview (trừ khi là 1.5)
+            if "2.5" not in m and "latest" not in m.lower() and "preview" not in m.lower():
+                filtered_models.append(m)
         
-        # Ưu tiên 1: gemini-1.5-flash
+        # Nếu không có model nào phù hợp, thử lại với điều kiện lỏng hơn (chỉ loại 2.5)
+        if not filtered_models:
+            filtered_models = [m for m in available_models if "2.5" not in m]
+        
+        # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier)
         for m in filtered_models:
             if "gemini-1.5-flash" in m: 
                 print(f"✅ Chọn model: {m} (tốt nhất cho free tier)")
@@ -122,15 +130,21 @@ def get_best_model_name():
                 print(f"✅ Chọn model: {m}")
                 return m
         
-        # Ưu tiên 3: gemini-pro (không có latest)
+        # Ưu tiên 3: gemini-pro (không có latest, không có 2.5)
         for m in filtered_models:
-            if "gemini-pro" in m and "latest" not in m.lower(): 
+            if "gemini-pro" in m and "2.5" not in m: 
                 print(f"✅ Chọn model: {m}")
                 return m
-            
-        if available_models: 
-            print(f"⚠️ Dùng model đầu tiên tìm được: {available_models[0]}")
-            return available_models[0]
+        
+        # Nếu vẫn còn model trong filtered_models, dùng model đầu tiên (đã loại bỏ 2.5)
+        if filtered_models:
+            selected = filtered_models[0]
+            # Đảm bảo cuối cùng: KHÔNG BAO GIỜ dùng 2.5
+            if "2.5" in selected:
+                print(f"⚠️ Model {selected} có chứa 2.5, bỏ qua và dùng fallback")
+            else:
+                print(f"✅ Dùng model: {selected}")
+                return selected
     except Exception as e:
         print(f"⚠️ Lỗi quét model: {e}")
     
