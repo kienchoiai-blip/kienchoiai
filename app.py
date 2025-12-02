@@ -106,45 +106,48 @@ def get_best_model_name():
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
-        # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, KHÔNG BAO GIỜ dùng gemini-2.5-pro, 2.0, exp)
-        # Loại bỏ HOÀN TOÀN các model 2.5, 2.0, exp, latest, preview (tốn nhiều memory và quota thấp)
-        filtered_models = []
+        # ✅ QUAN TRỌNG: CHỈ chọn model GEMINI (có "gemini" trong tên)
+        # Loại bỏ HOÀN TOÀN: gemma (text-only), 2.5, 2.0, exp, latest, preview
+        gemini_models = []
         for m in available_models:
-            # Loại bỏ: 2.5, 2.0, exp, latest, preview (chỉ dùng 1.5 để ổn định)
-            if ("2.5" not in m and "2.0" not in m and "exp" not in m.lower() and 
+            # CHỈ lấy model có "gemini" trong tên (KHÔNG phải gemma)
+            if ("gemini" in m.lower() and "gemma" not in m.lower() and
+                "2.5" not in m and "2.0" not in m and "exp" not in m.lower() and 
                 "latest" not in m.lower() and "preview" not in m.lower()):
-                filtered_models.append(m)
+                gemini_models.append(m)
         
-        # Nếu không có model nào phù hợp, thử lại với điều kiện lỏng hơn (chỉ loại 2.5 và 2.0)
-        if not filtered_models:
-            filtered_models = [m for m in available_models if "2.5" not in m and "2.0" not in m]
+        # Nếu không có model nào phù hợp, thử lại với điều kiện lỏng hơn (chỉ loại 2.5, 2.0, gemma)
+        if not gemini_models:
+            gemini_models = [m for m in available_models 
+                           if "gemini" in m.lower() and "gemma" not in m.lower() 
+                           and "2.5" not in m and "2.0" not in m]
         
-        # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier)
-        for m in filtered_models:
+        # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier, hỗ trợ video)
+        for m in gemini_models:
             if "gemini-1.5-flash" in m: 
-                print(f"✅ Chọn model: {m} (tốt nhất cho free tier)")
+                print(f"✅ Chọn model: {m} (tốt nhất cho free tier, hỗ trợ video)")
                 return m
         
-        # Ưu tiên 2: gemini-1.5-pro
-        for m in filtered_models:
+        # Ưu tiên 2: gemini-1.5-pro (hỗ trợ video)
+        for m in gemini_models:
             if "gemini-1.5-pro" in m: 
-                print(f"✅ Chọn model: {m}")
+                print(f"✅ Chọn model: {m} (hỗ trợ video)")
                 return m
         
-        # Ưu tiên 3: gemini-pro (không có latest, không có 2.5)
-        for m in filtered_models:
+        # Ưu tiên 3: gemini-pro (không có latest, không có 2.5, hỗ trợ video)
+        for m in gemini_models:
             if "gemini-pro" in m and "2.5" not in m: 
-                print(f"✅ Chọn model: {m}")
+                print(f"✅ Chọn model: {m} (hỗ trợ video)")
                 return m
         
-        # Nếu vẫn còn model trong filtered_models, dùng model đầu tiên (đã loại bỏ 2.5)
-        if filtered_models:
-            selected = filtered_models[0]
-            # Đảm bảo cuối cùng: KHÔNG BAO GIỜ dùng 2.5
-            if "2.5" in selected:
-                print(f"⚠️ Model {selected} có chứa 2.5, bỏ qua và dùng fallback")
+        # Nếu vẫn còn model gemini trong danh sách, dùng model đầu tiên
+        if gemini_models:
+            selected = gemini_models[0]
+            # Đảm bảo cuối cùng: CHỈ dùng gemini, KHÔNG BAO GIỜ dùng gemma hoặc 2.5
+            if "gemma" in selected.lower() or "2.5" in selected:
+                print(f"⚠️ Model {selected} không phù hợp, bỏ qua và dùng fallback")
             else:
-                print(f"✅ Dùng model: {selected}")
+                print(f"✅ Dùng model gemini: {selected}")
                 return selected
     except Exception as e:
         print(f"⚠️ Lỗi quét model: {e}")
