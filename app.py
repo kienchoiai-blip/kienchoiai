@@ -106,16 +106,24 @@ def get_best_model_name():
                 available_models.append(m.name)
         
         # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, không dùng gemini-2.5-pro)
-        for m in available_models:
-            if "gemini-1.5-flash" in m and "2.5" not in m: 
+        # Loại bỏ các model không phù hợp trước
+        filtered_models = [m for m in available_models if "2.5" not in m and "latest" not in m.lower()]
+        
+        # Ưu tiên 1: gemini-1.5-flash
+        for m in filtered_models:
+            if "gemini-1.5-flash" in m: 
                 print(f"✅ Chọn model: {m} (tốt nhất cho free tier)")
                 return m
-        for m in available_models:
-            if "gemini-1.5-pro" in m and "2.5" not in m: 
+        
+        # Ưu tiên 2: gemini-1.5-pro
+        for m in filtered_models:
+            if "gemini-1.5-pro" in m: 
                 print(f"✅ Chọn model: {m}")
                 return m
-        for m in available_models:
-            if "gemini-pro" in m and "2.5" not in m: 
+        
+        # Ưu tiên 3: gemini-pro (không có latest)
+        for m in filtered_models:
+            if "gemini-pro" in m and "latest" not in m.lower(): 
                 print(f"✅ Chọn model: {m}")
                 return m
             
@@ -332,14 +340,15 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # Gemini API giới hạn: 2GB (nhưng thực tế nên < 100MB để tránh timeout)
-    if file_size_mb > 100:
+    # Giảm giới hạn xuống 50MB cho Render free tier (512MB RAM)
+    # Để tránh out of memory khi upload và xử lý
+    if file_size_mb > 50:
         raise RuntimeError(
             f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
             "💡 Giải pháp:\n"
-            "• Video nên nhỏ hơn 100MB để xử lý nhanh\n"
+            "• Video nên nhỏ hơn 50MB để tránh lỗi bộ nhớ\n"
             "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-            "• Gemini API có thể từ chối file quá lớn"
+            "• Render free tier chỉ có 512MB RAM"
         )
     
     print("🚀 Đang gửi video lên AI...")
@@ -356,6 +365,11 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             file = genai.get_file(uploaded_file.name)
             if file.state.name == "ACTIVE":
                 print("✅ File đã được upload thành công")
+                # ✅ QUAN TRỌNG: Xóa file video NGAY SAU KHI upload thành công
+                # Để giải phóng memory cho Render free tier (512MB RAM)
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                    print("🗑️ Đã xóa file video để giải phóng bộ nhớ")
                 break
             if file.state.name == "FAILED":
                 error_msg = "Google từ chối file."
@@ -374,12 +388,18 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             raise RuntimeError("Timeout: Google xử lý file quá lâu. Vui lòng thử lại với video ngắn hơn.")
             
     except Exception as e:
+        # Đảm bảo cleanup nếu có lỗi
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except:
+                pass
         error_msg = str(e)
         if "rejected" in error_msg.lower() or "failed" in error_msg.lower():
             raise RuntimeError(
                 "⚠️ Google từ chối file video.\n\n"
                 "💡 Nguyên nhân có thể:\n"
-                "• File quá lớn (>100MB)\n"
+                "• File quá lớn (>50MB)\n"
                 "• Format không được hỗ trợ\n"
                 "• Video quá dài\n"
                 "• Nội dung vi phạm chính sách\n\n"
@@ -429,38 +449,46 @@ Ví dụ format:
     max_retries = 3
     retry_delay = 5  # giây
     
-    for attempt in range(max_retries):
-        try:
-            response = model.generate_content([uploaded_file, prompt], safety_settings=safety)
-            return response.text if response.text else "Không có nội dung trả về."
-        except Exception as e:
-            error_msg = str(e)
-            
-            # Kiểm tra rate limit (429)
-            if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
-                if attempt < max_retries - 1:
-                    # Tìm thời gian retry từ error message
-                    import re
-                    retry_match = re.search(r'retry in (\d+\.?\d*)s', error_msg, re.IGNORECASE)
-                    if retry_match:
-                        retry_delay = int(float(retry_match.group(1))) + 2
-                    
-                    print(f"⏳ Rate limit! Đợi {retry_delay}s trước khi thử lại (lần {attempt + 1}/{max_retries})...")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                    continue
-                else:
-                    raise RuntimeError(
-                        "⚠️ Đã vượt quá quota của Google Gemini API (free tier).\n\n"
-                        "💡 Giải pháp:\n"
-                        "• Đợi vài phút rồi thử lại\n"
-                        "• Hoặc nâng cấp API key lên paid plan\n"
-                        "• Free tier có giới hạn số requests mỗi phút\n\n"
-                        f"Chi tiết: {error_msg[:200]}"
-                    )
-            else:
-                # Lỗi khác, không retry
+    try:
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content([uploaded_file, prompt], safety_settings=safety)
+                result = response.text if response.text else "Không có nội dung trả về."
+                return result
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Kiểm tra rate limit (429)
+                if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        # Tìm thời gian retry từ error message
+                        import re
+                        retry_match = re.search(r'retry in (\d+\.?\d*)s', error_msg, re.IGNORECASE)
+                        if retry_match:
+                            retry_delay = int(float(retry_match.group(1))) + 2
+                        
+                        print(f"⏳ Rate limit! Đợi {retry_delay}s trước khi thử lại (lần {attempt + 1}/{max_retries})...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        raise RuntimeError(
+                            "⚠️ Đã vượt quá quota của Google Gemini API (free tier).\n\n"
+                            "💡 Giải pháp:\n"
+                            "• Đợi vài phút rồi thử lại\n"
+                            "• Hoặc nâng cấp API key lên paid plan\n"
+                            "• Free tier có giới hạn số requests mỗi phút\n\n"
+                            f"Chi tiết: {error_msg[:200]}"
+                        )
                 raise
+    finally:
+        # Cleanup: Xóa uploaded file từ Google (nếu có thể)
+        if uploaded_file:
+            try:
+                genai.delete_file(uploaded_file.name)
+                print("🗑️ Đã xóa file từ Google")
+            except:
+                pass
     
     return "Không có nội dung trả về."
 
@@ -507,7 +535,12 @@ def analyze():
         db.session.commit()
         log_script_to_csv(script_row, user.username)
 
-        if os.path.exists(video_path): os.remove(video_path)
+        # File đã được xóa trong analyze_video_with_gemini, nhưng đảm bảo cleanup
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except:
+                pass
         return jsonify({"script": script_text})
     except Exception as e:
         print(f"❌ LỖI: {e}")
