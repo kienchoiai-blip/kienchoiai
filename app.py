@@ -328,8 +328,33 @@ def download_video(url: str) -> str:
     try:
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+        
+        # ✅ Kiểm tra kích thước NGAY SAU KHI DOWNLOAD để tránh xử lý video quá lớn
+        if os.path.exists(temp_name):
+            file_size = os.path.getsize(temp_name)
+            file_size_mb = file_size / (1024 * 1024)
+            print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
+            
+            # Giới hạn 30MB cho Render free tier (512MB RAM)
+            if file_size_mb > 30:
+                os.remove(temp_name)  # Xóa ngay để giải phóng bộ nhớ
+                raise RuntimeError(
+                    f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
+                    "💡 Giải pháp:\n"
+                    "• Video nên nhỏ hơn 30MB để tránh lỗi bộ nhớ\n"
+                    "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
+                    "• Render free tier chỉ có 512MB RAM\n"
+                    "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
+                )
+        
         return temp_name
     except Exception as e:
+        # Cleanup nếu có lỗi
+        if os.path.exists(temp_name):
+            try:
+                os.remove(temp_name)
+            except:
+                pass
         error_msg = str(e)
         error_msg = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
         raise RuntimeError(f"Lỗi tải video: {error_msg}")
@@ -340,15 +365,17 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # Giảm giới hạn xuống 50MB cho Render free tier (512MB RAM)
-    # Để tránh out of memory khi upload và xử lý
-    if file_size_mb > 50:
+    # Giảm giới hạn xuống 30MB cho Render free tier (512MB RAM)
+    # Với 512MB RAM, cần dự trữ cho Python, Flask, yt-dlp, và Gemini API
+    # 30MB video + overhead = ~100-150MB, an toàn hơn cho 512MB total
+    if file_size_mb > 30:
         raise RuntimeError(
             f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
             "💡 Giải pháp:\n"
-            "• Video nên nhỏ hơn 50MB để tránh lỗi bộ nhớ\n"
+            "• Video nên nhỏ hơn 30MB để tránh lỗi bộ nhớ\n"
             "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-            "• Render free tier chỉ có 512MB RAM"
+            "• Render free tier chỉ có 512MB RAM (cần dự trữ cho hệ thống)\n"
+            "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
         )
     
     print("🚀 Đang gửi video lên AI...")
@@ -399,7 +426,7 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             raise RuntimeError(
                 "⚠️ Google từ chối file video.\n\n"
                 "💡 Nguyên nhân có thể:\n"
-                "• File quá lớn (>50MB)\n"
+                "• File quá lớn (>30MB)\n"
                 "• Format không được hỗ trợ\n"
                 "• Video quá dài\n"
                 "• Nội dung vi phạm chính sách\n\n"
