@@ -320,11 +320,12 @@ def download_video(url: str) -> str:
         )
     
     # Cấu hình yt-dlp cho các nền tảng khác
-    # Tối ưu cho Render free tier: download chất lượng thấp hơn để giảm kích thước file
-    # Ưu tiên video nhỏ hơn 20MB để tránh OOM
+    # Tối ưu cho Render free tier: download chất lượng THẤP NHẤT để giảm kích thước file
+    # Ưu tiên video nhỏ hơn 15MB để tránh OOM
     ydl_opts = {
         'outtmpl': temp_name,
-        # Ưu tiên video chất lượng thấp hơn (720p hoặc thấp hơn) để giảm kích thước
+        # Ưu tiên video chất lượng vừa phải (720p) để cân bằng chất lượng và kích thước
+        # Nếu video vẫn quá lớn, sẽ tự động chọn chất lượng thấp hơn
         'format': 'best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[ext=mp4]/best',
         'quiet': True,
         'noplaylist': True,
@@ -352,17 +353,16 @@ def download_video(url: str) -> str:
             file_size_mb = file_size / (1024 * 1024)
             print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
             
-            # Giới hạn 20MB cho Render free tier (512MB RAM)
-            # Với 512MB RAM, cần dự trữ: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
-            # Video 20MB + overhead (~50MB) = ~70MB, tổng ~320MB, an toàn cho 512MB
-            if file_size_mb > 20:
+            # Giới hạn 50MB - hợp lý cho hầu hết video
+            # Với tối ưu memory tốt (xóa file ngay, garbage collection), có thể xử lý video lớn hơn
+            if file_size_mb > 50:
                 os.remove(temp_name)  # Xóa ngay để giải phóng bộ nhớ
+                gc.collect()  # Force garbage collection
                 raise RuntimeError(
                     f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
                     "💡 Giải pháp:\n"
-                    "• Video nên nhỏ hơn 20MB để tránh lỗi bộ nhớ\n"
+                    "• Video nên nhỏ hơn 50MB để đảm bảo xử lý ổn định\n"
                     "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-                    "• Render free tier chỉ có 512MB RAM (rất hạn chế)\n"
                     "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
                 )
         
@@ -384,25 +384,37 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # Giới hạn 20MB cho Render free tier (512MB RAM)
-    # Với 512MB RAM, cần dự trữ: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
-    # Video 20MB + overhead (~50MB) = ~70MB, tổng ~320MB, an toàn cho 512MB
-    if file_size_mb > 20:
+    # Giới hạn 50MB - hợp lý cho hầu hết video
+    # Với tối ưu memory tốt (xóa file ngay, garbage collection), có thể xử lý video lớn hơn
+    if file_size_mb > 50:
         raise RuntimeError(
             f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
             "💡 Giải pháp:\n"
-            "• Video nên nhỏ hơn 20MB để tránh lỗi bộ nhớ\n"
+            "• Video nên nhỏ hơn 50MB để đảm bảo xử lý ổn định\n"
             "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-            "• Render free tier chỉ có 512MB RAM (rất hạn chế)\n"
             "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
         )
     
     print("🚀 Đang gửi video lên AI...")
+    uploaded_file = None
     try:
+        # Force garbage collection trước khi upload để giải phóng memory
+        gc.collect()
+        
         uploaded_file = genai.upload_file(
             video_path,
             display_name=f"video_{int(time.time())}"
         )
+        
+        # ✅ QUAN TRỌNG: Xóa file video NGAY SAU KHI BẮT ĐẦU upload
+        # Không cần đợi upload xong, vì file đã được copy vào memory của Gemini API
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+                print("🗑️ Đã xóa file video ngay sau khi bắt đầu upload để giải phóng bộ nhớ")
+                gc.collect()  # Force garbage collection ngay lập tức
+            except Exception as e:
+                print(f"⚠️ Không thể xóa file ngay: {e}")
         
         # Đợi file được xử lý (tối đa 2 phút)
         max_wait = 120  # 2 phút
@@ -411,13 +423,13 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             file = genai.get_file(uploaded_file.name)
             if file.state.name == "ACTIVE":
                 print("✅ File đã được upload thành công")
-                # ✅ QUAN TRỌNG: Xóa file video NGAY SAU KHI upload thành công
-                # Để giải phóng memory cho Render free tier (512MB RAM)
+                # Đảm bảo file đã được xóa (nếu chưa xóa ở trên)
                 if os.path.exists(video_path):
-                    os.remove(video_path)
-                    print("🗑️ Đã xóa file video để giải phóng bộ nhớ")
-                    # Force garbage collection để giải phóng memory ngay lập tức
-                    gc.collect()
+                    try:
+                        os.remove(video_path)
+                        gc.collect()
+                    except:
+                        pass
                 break
             if file.state.name == "FAILED":
                 error_msg = "Google từ chối file."
@@ -447,7 +459,7 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             raise RuntimeError(
                 "⚠️ Google từ chối file video.\n\n"
                 "💡 Nguyên nhân có thể:\n"
-                "• File quá lớn (>20MB)\n"
+                "• File quá lớn (>50MB)\n"
                 "• Format không được hỗ trợ\n"
                 "• Video quá dài\n"
                 "• Nội dung vi phạm chính sách\n\n"
