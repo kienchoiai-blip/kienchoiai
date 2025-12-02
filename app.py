@@ -134,18 +134,18 @@ def get_best_model_name():
                 print(f"✅ Chọn model: {m} (hỗ trợ video)")
                 return m
         
-        # Ưu tiên 3: gemini-pro (không có latest, không có 2.5, hỗ trợ video)
+        # Ưu tiên 3: gemini-pro (KHÔNG có latest, KHÔNG có 2.5, hỗ trợ video)
         for m in gemini_models:
-            if "gemini-pro" in m and "2.5" not in m: 
+            if "gemini-pro" in m and "2.5" not in m and "latest" not in m.lower(): 
                 print(f"✅ Chọn model: {m} (hỗ trợ video)")
                 return m
         
-        # Nếu vẫn còn model gemini trong danh sách, dùng model đầu tiên
+        # Nếu vẫn còn model gemini trong danh sách, dùng model đầu tiên (đã loại bỏ latest)
         if gemini_models:
             selected = gemini_models[0]
-            # Đảm bảo cuối cùng: CHỈ dùng gemini, KHÔNG BAO GIỜ dùng gemma hoặc 2.5
-            if "gemma" in selected.lower() or "2.5" in selected:
-                print(f"⚠️ Model {selected} không phù hợp, bỏ qua và dùng fallback")
+            # Đảm bảo cuối cùng: CHỈ dùng gemini, KHÔNG BAO GIỜ dùng gemma, 2.5, hoặc latest
+            if "gemma" in selected.lower() or "2.5" in selected or "latest" in selected.lower():
+                print(f"⚠️ Model {selected} không phù hợp (có gemma/2.5/latest), bỏ qua và dùng fallback")
             else:
                 print(f"✅ Dùng model gemini: {selected}")
                 return selected
@@ -357,17 +357,20 @@ def download_video(url: str) -> str:
             file_size_mb = file_size / (1024 * 1024)
             print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
             
-            # Giới hạn 50MB - hợp lý cho hầu hết video
-            # Với tối ưu memory tốt (xóa file ngay, garbage collection), có thể xử lý video lớn hơn
-            if file_size_mb > 50:
+            # Giới hạn 10MB cho Render free tier (512MB RAM) - RẤT HẠN CHẾ
+            # Với 512MB RAM: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
+            # Video 10MB + overhead (~30MB) = ~40MB, tổng ~290MB, an toàn cho 512MB
+            # Nếu muốn xử lý video lớn hơn, cần upgrade lên paid plan
+            if file_size_mb > 10:
                 os.remove(temp_name)  # Xóa ngay để giải phóng bộ nhớ
                 gc.collect()  # Force garbage collection
                 raise RuntimeError(
                     f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
                     "💡 Giải pháp:\n"
-                    "• Video nên nhỏ hơn 50MB để đảm bảo xử lý ổn định\n"
+                    "• Video nên nhỏ hơn 10MB để tránh lỗi Out of Memory\n"
+                    "• Render free tier chỉ có 512MB RAM (RẤT HẠN CHẾ)\n"
                     "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-                    "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
+                    "• Hoặc upgrade lên paid plan để xử lý video lớn hơn (khuyến nghị)"
                 )
         
         return temp_name
@@ -388,9 +391,11 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # Giới hạn 50MB - hợp lý cho hầu hết video
-    # Với tối ưu memory tốt (xóa file ngay, garbage collection), có thể xử lý video lớn hơn
-    if file_size_mb > 50:
+    # Giới hạn 10MB cho Render free tier (512MB RAM) - RẤT HẠN CHẾ
+    # Với 512MB RAM: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
+    # Video 10MB + overhead (~30MB) = ~40MB, tổng ~290MB, an toàn cho 512MB
+    # Nếu muốn xử lý video lớn hơn, cần upgrade lên paid plan
+    if file_size_mb > 10:
         raise RuntimeError(
             f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
             "💡 Giải pháp:\n"
@@ -468,7 +473,7 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
             raise RuntimeError(
                 "⚠️ Google từ chối file video.\n\n"
                 "💡 Nguyên nhân có thể:\n"
-                "• File quá lớn (>50MB)\n"
+                "• File quá lớn (>10MB)\n"
                 "• Format không được hỗ trợ\n"
                 "• Video quá dài\n"
                 "• Nội dung vi phạm chính sách\n\n"
