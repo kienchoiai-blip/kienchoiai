@@ -264,6 +264,31 @@ def log_script_to_csv(script, username):
 
 with app.app_context():
     db.create_all()
+    
+    # ✅ MIGRATION: Xóa NOT NULL constraint cho script_content (cho phép NULL)
+    # Database cũ có constraint NOT NULL, nhưng code mới không lưu script_content
+    try:
+        # Kiểm tra xem có phải PostgreSQL không
+        if DATABASE_URL and "postgresql" in DATABASE_URL.lower():
+            from sqlalchemy import text
+            # Thử ALTER TABLE để xóa NOT NULL constraint
+            try:
+                db.session.execute(text("ALTER TABLE script ALTER COLUMN script_content DROP NOT NULL"))
+                db.session.commit()
+                print("✅ Đã xóa NOT NULL constraint cho script_content (migration thành công)")
+            except Exception as e:
+                error_msg = str(e).lower()
+                # Nếu constraint đã không tồn tại hoặc đã được xóa, bỏ qua
+                if "does not exist" in error_msg or "already" in error_msg:
+                    print("✅ script_content đã cho phép NULL (không cần migration)")
+                else:
+                    print(f"⚠️ Không thể migration (có thể đã được xóa): {e}")
+            except:
+                # Nếu không phải PostgreSQL hoặc lỗi khác, bỏ qua
+                pass
+    except Exception as e:
+        print(f"⚠️ Migration check: {e}")
+    
     admin_username = "admin"
     admin_password = "Admin123!"
     
