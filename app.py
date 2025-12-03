@@ -265,29 +265,9 @@ def log_script_to_csv(script, username):
 with app.app_context():
     db.create_all()
     
-    # ✅ MIGRATION: Xóa NOT NULL constraint cho script_content (cho phép NULL)
-    # Database cũ có constraint NOT NULL, nhưng code mới không lưu script_content
-    try:
-        # Kiểm tra xem có phải PostgreSQL không
-        if DATABASE_URL and "postgresql" in DATABASE_URL.lower():
-            from sqlalchemy import text
-            # Thử ALTER TABLE để xóa NOT NULL constraint
-            try:
-                db.session.execute(text("ALTER TABLE script ALTER COLUMN script_content DROP NOT NULL"))
-                db.session.commit()
-                print("✅ Đã xóa NOT NULL constraint cho script_content (migration thành công)")
-            except Exception as e:
-                error_msg = str(e).lower()
-                # Nếu constraint đã không tồn tại hoặc đã được xóa, bỏ qua
-                if "does not exist" in error_msg or "already" in error_msg:
-                    print("✅ script_content đã cho phép NULL (không cần migration)")
-                else:
-                    print(f"⚠️ Không thể migration (có thể đã được xóa): {e}")
-            except:
-                # Nếu không phải PostgreSQL hoặc lỗi khác, bỏ qua
-                pass
-    except Exception as e:
-        print(f"⚠️ Migration check: {e}")
+    # ✅ KHÔNG CẦN MIGRATION - KHÔNG LƯU SCRIPT VÀO DATABASE NỮA
+    # Database chỉ lưu thông tin đăng nhập (User model)
+    # KHÔNG lưu: Video file, kịch bản, link video, lịch sử
     
     admin_username = "admin"
     admin_password = "Admin123!"
@@ -755,23 +735,17 @@ def analyze():
         if not url: return jsonify({"error": "Thiếu URL"}), 400
 
         print(f"📥 Bắt đầu xử lý video từ URL: {url}")
-        print("💡 LƯU Ý: Video sẽ KHÔNG được lưu lại, chỉ lưu LINK VIDEO vào database (KHÔNG lưu kịch bản - tiết kiệm memory)")
+        print("💡 LƯU Ý: KHÔNG lưu bất cứ thứ gì vào database (chỉ lưu thông tin đăng nhập)")
+        print("   ❌ KHÔNG lưu: Video file, kịch bản, link video - TIẾT KIỆM MEMORY TỐI ĐA")
         
         video_path = download_video(url)
         script_text = analyze_video_with_gemini(video_path, mode=mode)
 
-        # ✅ LƯU LINK VIDEO VÀO DATABASE (KHÔNG LƯU KỊCH BẢN - TIẾT KIỆM MEMORY)
-        # Database chỉ lưu:
-        # - video_url: URL của video (string, rất nhỏ ~100-200 bytes) - ĐỂ BIẾT VIDEO NÀO ĐÃ XỬ LÝ
-        # - script_content: NULL (KHÔNG lưu) - TIẾT KIỆM MEMORY/DATABASE
-        # - KHÔNG lưu video file (video đã được xóa ngay sau khi phân tích)
-        print("💾 Đang lưu link video vào database...")
-        print("   📝 Lưu: URL video (string nhỏ) - Để biết video nào đã xử lý")
-        print("   ❌ KHÔNG lưu: Kịch bản (tiết kiệm memory) + Video file (đã xóa)")
-        script_row = Script(user_id=user.id, video_url=url, script_content=None, mode=mode)  # KHÔNG lưu script_content
-        db.session.add(script_row)
-        db.session.commit()
-        print(f"✅ Đã lưu link video vào database (ID: {script_row.id}) - KHÔNG lưu kịch bản")
+        # ✅ KHÔNG LƯU GÌ VÀO DATABASE - CHỈ TRẢ VỀ KỊCH BẢN CHO USER
+        # Database CHỈ lưu thông tin đăng nhập (User model)
+        # KHÔNG lưu: Video file, kịch bản, link video, lịch sử
+        # → TIẾT KIỆM MEMORY/DATABASE TỐI ĐA
+        print("✅ Đã tạo kịch bản thành công - KHÔNG lưu vào database (tiết kiệm memory)")
 
         # ✅ Đảm bảo video đã được xóa (đã xóa trong analyze_video_with_gemini, nhưng kiểm tra lại)
         if os.path.exists(video_path):
@@ -851,21 +825,13 @@ def api_current_user():
 
 @app.route("/api/get_history", methods=["GET"])
 def api_get_history():
-    """Lấy lịch sử video đã xử lý (chỉ link video, không có kịch bản)"""
+    """Lấy lịch sử - KHÔNG lưu lịch sử để tiết kiệm memory"""
     user = get_current_user()
     if not user: return jsonify({"items": []}), 401
     
-    scripts = Script.query.filter_by(user_id=user.id).order_by(Script.created_at.desc()).all()
-    
-    # CHỈ trả về link video, KHÔNG trả về script_content (tiết kiệm memory)
-    items = [{
-        "id": s.id,
-        "video_url": s.video_url,
-        "mode": s.mode,
-        "created_at": s.created_at.isoformat()
-        # KHÔNG có script_content - tiết kiệm memory
-    } for s in scripts]
-    return jsonify({"items": items})
+    # ✅ KHÔNG TRẢ VỀ LỊCH SỬ - TIẾT KIỆM MEMORY
+    # Database chỉ lưu thông tin đăng nhập, không lưu lịch sử
+    return jsonify({"items": []})
 
 @app.route("/api/admin/users", methods=["GET"])
 def api_admin_users():
@@ -916,7 +882,7 @@ def api_admin_block_user(user_id):
 
 @app.route("/api/admin/users/<int:user_id>/scripts", methods=["GET"])
 def api_admin_get_user_scripts(user_id):
-    """Lấy danh sách video đã xử lý của user (chỉ admin) - CHỈ link video, không có kịch bản"""
+    """Lấy danh sách video đã xử lý của user (chỉ admin) - KHÔNG lưu lịch sử để tiết kiệm memory"""
     admin = get_current_user()
     if not admin or not admin.is_admin:
         return jsonify({"error": "Unauthorized"}), 403
@@ -925,21 +891,12 @@ def api_admin_get_user_scripts(user_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
     
-    scripts = Script.query.filter_by(user_id=user_id).order_by(Script.created_at.desc()).all()
-    
-    # CHỈ trả về link video, KHÔNG trả về script_content (tiết kiệm memory)
-    items = [{
-        "id": s.id,
-        "video_url": s.video_url,
-        "mode": s.mode,
-        "created_at": s.created_at.isoformat() if s.created_at else None
-        # KHÔNG có script_content - tiết kiệm memory
-    } for s in scripts]
-    
+    # ✅ KHÔNG TRẢ VỀ LỊCH SỬ - TIẾT KIỆM MEMORY
+    # Database chỉ lưu thông tin đăng nhập, không lưu lịch sử
     return jsonify({
         "username": user.username,
-        "scripts": items,
-        "total": len(items)
+        "scripts": [],
+        "total": 0
     })
 
 @app.route("/api/admin/stats", methods=["GET"])
