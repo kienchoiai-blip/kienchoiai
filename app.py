@@ -176,10 +176,17 @@ class User(db.Model):
     scripts = db.relationship("Script", backref="user", lazy=True)
 
 class Script(db.Model):
+    """Model lưu kịch bản đã phân tích từ video
+    
+    LƯU Ý QUAN TRỌNG:
+    - video_url: Chỉ lưu URL (string, rất nhỏ ~100-200 bytes)
+    - script_content: Lưu kịch bản đã phân tích (text)
+    - KHÔNG lưu video file vào database (video chỉ tồn tại tạm thời khi xử lý)
+    """
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-    video_url = db.Column(db.String(1024), nullable=False)
-    script_content = db.Column(db.Text, nullable=False)
+    video_url = db.Column(db.String(1024), nullable=False)  # Chỉ lưu URL (string nhỏ)
+    script_content = db.Column(db.Text, nullable=False)  # Lưu kịch bản (text)
     mode = db.Column(db.String(32), default="detailed", nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
@@ -279,25 +286,25 @@ def download_video(url: str) -> str:
             },
             {
                 'outtmpl': temp_name,
-                'format': 'worst[ext=mp4]/worst',
+                'format': 'worst[height<=360][ext=mp4]/worst[height<=480][ext=mp4]/worst[ext=mp4]/worst',
                 'quiet': True,
                 'noplaylist': True,
                 'no_warnings': True,
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'referer': 'https://www.instagram.com/',
                 'socket_timeout': 60,
-                'http_chunk_size': 10485760,
+                'http_chunk_size': 5242880,  # 5MB chunks
             },
             {
                 'outtmpl': temp_name,
-                'format': 'best[height<=720]/best',
+                'format': 'worst[height<=360][ext=mp4]/worst[height<=480][ext=mp4]/worst[height<=720][ext=mp4]/best[height<=360][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720][ext=mp4]/worst',
                 'quiet': True,
                 'noplaylist': True,
                 'no_warnings': True,
                 'user_agent': 'Instagram 219.0.0.12.117 Android',
                 'referer': 'https://www.instagram.com/',
                 'socket_timeout': 60,
-                'http_chunk_size': 10485760,
+                'http_chunk_size': 5242880,  # 5MB chunks
             }
         ]
         
@@ -327,12 +334,12 @@ def download_video(url: str) -> str:
     
     # Cấu hình yt-dlp cho các nền tảng khác
     # Tối ưu cho Render free tier: download chất lượng THẤP NHẤT để giảm kích thước file
-    # Ưu tiên video nhỏ hơn 15MB để tránh OOM
+    # Ưu tiên video nhỏ hơn 5MB để tránh OOM (512MB RAM rất hạn chế)
     ydl_opts = {
         'outtmpl': temp_name,
-        # Ưu tiên video chất lượng vừa phải (720p) để cân bằng chất lượng và kích thước
-        # Nếu video vẫn quá lớn, sẽ tự động chọn chất lượng thấp hơn
-        'format': 'best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[ext=mp4]/best',
+        # ✅ ƯU TIÊN VIDEO CHẤT LƯỢNG THẤP NHẤT để giảm kích thước file
+        # Thứ tự: 360p → 480p → 720p → best (chỉ dùng best nếu không có lựa chọn khác)
+        'format': 'worst[height<=360][ext=mp4]/worst[height<=480][ext=mp4]/worst[height<=720][ext=mp4]/best[height<=360][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720][ext=mp4]/worst[ext=mp4]/best[ext=mp4]',
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
@@ -341,12 +348,12 @@ def download_video(url: str) -> str:
         'referer': url,
         'nocheckcertificate': True,
         'prefer_insecure': False,
-        'retries': 3,
-        'fragment_retries': 3,
+        'retries': 2,  # Giảm retries để tránh timeout
+        'fragment_retries': 2,
         'ignoreerrors': False,
         # Tăng timeout cho Render free tier (mặc định 20s, tăng lên 60s)
         'socket_timeout': 60,
-        'http_chunk_size': 10485760,  # 10MB chunks
+        'http_chunk_size': 5242880,  # 5MB chunks (giảm từ 10MB)
     }
     
     try:
@@ -359,20 +366,22 @@ def download_video(url: str) -> str:
             file_size_mb = file_size / (1024 * 1024)
             print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
             
-            # Giới hạn 10MB cho Render free tier (512MB RAM) - RẤT HẠN CHẾ
+            # ✅ GIỚI HẠN 5MB cho Render free tier (512MB RAM) - RẤT HẠN CHẾ
             # Với 512MB RAM: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
-            # Video 10MB + overhead (~30MB) = ~40MB, tổng ~290MB, an toàn cho 512MB
+            # Video 5MB + overhead (~20MB) = ~25MB, tổng ~275MB, an toàn cho 512MB
+            # Video 7.63MB đã gây timeout/OOM → cần giảm xuống 5MB
             # Nếu muốn xử lý video lớn hơn, cần upgrade lên paid plan
-            if file_size_mb > 10:
+            if file_size_mb > 5:
                 os.remove(temp_name)  # Xóa ngay để giải phóng bộ nhớ
                 gc.collect()  # Force garbage collection
                 raise RuntimeError(
                     f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
                     "💡 Giải pháp:\n"
-                    "• Video nên nhỏ hơn 10MB để tránh lỗi Out of Memory\n"
+                    "• Video nên nhỏ hơn 5MB để tránh lỗi Out of Memory\n"
                     "• Render free tier chỉ có 512MB RAM (RẤT HẠN CHẾ)\n"
-                    "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-                    "• Hoặc upgrade lên paid plan để xử lý video lớn hơn (khuyến nghị)"
+                    "• Thử video ngắn hơn (< 30 giây) hoặc chất lượng thấp hơn\n"
+                    "• Hoặc upgrade lên paid plan để xử lý video lớn hơn (khuyến nghị)\n\n"
+                    "📝 Lưu ý: Chỉ kịch bản được lưu, video KHÔNG được lưu lại"
                 )
         
         return temp_name
@@ -393,17 +402,20 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # Giới hạn 10MB cho Render free tier (512MB RAM) - RẤT HẠN CHẾ
+    # ✅ GIỚI HẠN 5MB cho Render free tier (512MB RAM) - RẤT HẠN CHẾ
     # Với 512MB RAM: Python (~50MB) + Flask (~30MB) + yt-dlp (~20MB) + Gemini API (~50MB) + System (~100MB) = ~250MB
-    # Video 10MB + overhead (~30MB) = ~40MB, tổng ~290MB, an toàn cho 512MB
+    # Video 5MB + overhead (~20MB) = ~25MB, tổng ~275MB, an toàn cho 512MB
+    # Video 7.63MB đã gây timeout/OOM → cần giảm xuống 5MB
     # Nếu muốn xử lý video lớn hơn, cần upgrade lên paid plan
-    if file_size_mb > 10:
+    if file_size_mb > 5:
         raise RuntimeError(
             f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
             "💡 Giải pháp:\n"
-            "• Video nên nhỏ hơn 50MB để đảm bảo xử lý ổn định\n"
-            "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-            "• Hoặc upgrade lên paid plan để xử lý video lớn hơn"
+            "• Video nên nhỏ hơn 5MB để tránh lỗi Out of Memory\n"
+            "• Render free tier chỉ có 512MB RAM (RẤT HẠN CHẾ)\n"
+            "• Thử video ngắn hơn (< 30 giây) hoặc chất lượng thấp hơn\n"
+            "• Hoặc upgrade lên paid plan để xử lý video lớn hơn (khuyến nghị)\n\n"
+            "📝 Lưu ý: Chỉ kịch bản được lưu, video KHÔNG được lưu lại"
         )
     
     print("🚀 Đang gửi video lên AI...")
@@ -629,8 +641,14 @@ def analyze():
         video_path = download_video(url)
         script_text = analyze_video_with_gemini(video_path, mode=mode)
 
-        # ✅ LƯU KỊCH BẢN VÀO DATABASE (KHÔNG LƯU VIDEO)
+        # ✅ LƯU KỊCH BẢN VÀO DATABASE (KHÔNG LƯU VIDEO FILE)
+        # Database chỉ lưu:
+        # - video_url: URL của video (string, rất nhỏ ~100-200 bytes)
+        # - script_content: Kịch bản đã phân tích (text)
+        # - KHÔNG lưu video file (video đã được xóa ngay sau khi phân tích)
         print("💾 Đang lưu kịch bản vào database...")
+        print("   📝 Lưu: URL video (string nhỏ) + Kịch bản (text)")
+        print("   ❌ KHÔNG lưu: Video file (đã xóa)")
         script_row = Script(user_id=user.id, video_url=url, script_content=script_text, mode=mode)
         db.session.add(script_row)
         db.session.commit()
