@@ -101,12 +101,25 @@ db = SQLAlchemy(app)
 def get_best_model_name():
     print("🔄 Đang quét danh sách Model khả dụng...")
     try:
+        # Lấy danh sách models và kiểm tra hỗ trợ generateContent
         available_models = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                available_models.append(m.name)
+        all_models_info = []
         
-        print(f"📋 Tìm thấy {len(available_models)} models khả dụng")
+        for m in genai.list_models():
+            model_name = m.name
+            has_generate_content = 'generateContent' in m.supported_generation_methods
+            all_models_info.append((model_name, has_generate_content))
+            
+            if has_generate_content:
+                available_models.append(model_name)
+        
+        print(f"📋 Tìm thấy {len(available_models)} models hỗ trợ generateContent (tổng {len(all_models_info)} models)")
+        
+        # In ra tất cả models để debug (chỉ 10 models đầu)
+        print("📝 Danh sách models (10 đầu tiên):")
+        for i, (name, has_gen) in enumerate(all_models_info[:10]):
+            status = "✅" if has_gen else "❌"
+            print(f"   {status} {name}")
         
         # ✅ QUAN TRỌNG: CHỈ chọn model GEMINI (có "gemini" trong tên)
         # Loại bỏ HOÀN TOÀN: gemma (text-only), 2.5, 2.0, exp, latest, preview, 3-pro
@@ -131,11 +144,26 @@ def get_best_model_name():
         
         print(f"📋 Sau khi lọc: {len(gemini_models)} models phù hợp")
         
+        if not gemini_models:
+            print("⚠️ Không tìm thấy model gemini phù hợp sau khi lọc!")
+            print("📝 Danh sách tất cả models gemini có sẵn:")
+            for m in available_models:
+                if "gemini" in m.lower() and "gemma" not in m.lower():
+                    print(f"   - {m}")
+            # Fallback: Dùng model gemini đầu tiên có sẵn (nếu có)
+            for m in available_models:
+                if "gemini" in m.lower() and "gemma" not in m.lower():
+                    print(f"⚠️ Fallback: Dùng model đầu tiên tìm thấy: {m}")
+                    return m
+        
         # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier, hỗ trợ video, nhẹ nhất)
-        for m in gemini_models:
-            if "gemini-1.5-flash" in m.lower(): 
-                print(f"✅ Chọn model: {m} (tốt nhất cho free tier, hỗ trợ video, nhẹ nhất)")
-                return m
+        # Thử các biến thể: flash, flash-001, flash-002, flash-latest
+        flash_variants = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-flash-002", "gemini-1.5-flash-latest"]
+        for variant in flash_variants:
+            for m in gemini_models:
+                if variant in m.lower(): 
+                    print(f"✅ Chọn model: {m} (tốt nhất cho free tier, hỗ trợ video, nhẹ nhất)")
+                    return m
         
         # Ưu tiên 2: gemini-1.5-pro (hỗ trợ video, nhưng nặng hơn flash)
         for m in gemini_models:
@@ -150,25 +178,34 @@ def get_best_model_name():
                 print(f"✅ Chọn model: {m} (hỗ trợ video)")
                 return m
         
-        # Nếu vẫn còn model gemini trong danh sách, kiểm tra lại trước khi dùng
+        # Nếu vẫn còn model gemini trong danh sách, dùng model đầu tiên (đã được lọc)
         if gemini_models:
             selected = gemini_models[0]
-            # Đảm bảo cuối cùng: CHỈ dùng gemini, KHÔNG BAO GIỜ dùng các model không phù hợp
-            for keyword in excluded_keywords:
-                if keyword in selected.lower() or keyword in selected:
-                    print(f"⚠️ Model {selected} không phù hợp (có '{keyword}'), bỏ qua và dùng fallback")
-                    break
-            else:
-                print(f"✅ Dùng model gemini: {selected}")
-                return selected
+            print(f"✅ Dùng model gemini đầu tiên trong danh sách đã lọc: {selected}")
+            return selected
+            
     except Exception as e:
         print(f"⚠️ Lỗi quét model: {e}")
         import traceback
         traceback.print_exc()
     
-    # Fallback: Dùng gemini-1.5-flash (không dùng 2.5-pro, 3-pro, preview vì quota thấp/nặng)
-    print("✅ Fallback: Dùng gemini-1.5-flash (model nhẹ nhất, tốt nhất cho free tier)")
-    return "models/gemini-1.5-flash"
+    # Fallback cuối cùng: Thử các model phổ biến
+    fallback_models = [
+        "models/gemini-1.5-flash-001",
+        "models/gemini-1.5-flash-002", 
+        "models/gemini-1.5-pro-001",
+        "models/gemini-pro",
+        "models/gemini-1.5-pro"
+    ]
+    
+    print("⚠️ Không tìm thấy model phù hợp, thử fallback models...")
+    for fallback in fallback_models:
+        print(f"   Thử: {fallback}")
+        # Không test ở đây, để code tự báo lỗi nếu model không tồn tại
+    
+    # Fallback cuối cùng: Dùng model đầu tiên trong danh sách (nếu có)
+    print("⚠️ Fallback: Sẽ dùng model đầu tiên có sẵn (có thể gây lỗi nếu không phù hợp)")
+    return "models/gemini-1.5-flash-001"  # Thử biến thể có số version
 
 CHOSEN_MODEL = get_best_model_name()
 print(f"✅ ĐÃ CHỐT DÙNG MODEL: {CHOSEN_MODEL}")
@@ -508,7 +545,51 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
         raise
 
     print(f"✍️ Đang viết kịch bản (mode={mode})...")
-    model = genai.GenerativeModel(CHOSEN_MODEL)
+    print(f"🤖 Đang dùng model: {CHOSEN_MODEL}")
+    
+    # Thử tạo model, nếu lỗi 404 thì thử model khác
+    try:
+        model = genai.GenerativeModel(CHOSEN_MODEL)
+    except Exception as e:
+        error_msg = str(e)
+        if "404" in error_msg or "not found" in error_msg.lower() or "not supported" in error_msg.lower():
+            print(f"❌ Model {CHOSEN_MODEL} không tồn tại hoặc không được hỗ trợ!")
+            print("🔄 Đang thử tìm model khác...")
+            
+            # Thử tìm model khác từ danh sách
+            try:
+                available_models = []
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        m_name = m.name
+                        if ("gemini" in m_name.lower() and "gemma" not in m_name.lower() and
+                            "2.5" not in m_name and "2.0" not in m_name and 
+                            "exp" not in m_name.lower() and "latest" not in m_name.lower() and
+                            "preview" not in m_name.lower() and "3-pro" not in m_name.lower()):
+                            available_models.append(m_name)
+                
+                if available_models:
+                    fallback_model = available_models[0]
+                    print(f"✅ Tìm thấy model thay thế: {fallback_model}")
+                    model = genai.GenerativeModel(fallback_model)
+                    print(f"✅ Đã chuyển sang model: {fallback_model} (chỉ cho request này)")
+                else:
+                    raise RuntimeError(
+                        "⚠️ Không tìm thấy model Gemini nào khả dụng!\n\n"
+                        "💡 Giải pháp:\n"
+                        "• Kiểm tra API key có đúng không\n"
+                        "• Kiểm tra quota API key\n"
+                        "• Thử lại sau vài phút\n\n"
+                        f"Chi tiết: {error_msg[:200]}"
+                    )
+            except Exception as e2:
+                raise RuntimeError(
+                    f"⚠️ Lỗi model: {CHOSEN_MODEL} không tồn tại và không thể tìm model thay thế.\n\n"
+                    f"💡 Chi tiết: {error_msg[:200]}\n\n"
+                    "Vui lòng kiểm tra API key và thử lại."
+                )
+        else:
+            raise
     
     if mode == "transcript":
         prompt = """Hãy nghe video này, trích xuất toàn bộ lời thoại và DỊCH SANG TIẾNG VIỆT chuẩn xác.
@@ -878,7 +959,29 @@ def api_translate():
         print(f"🌐 Đang dịch sang {language_name} ({target_language})...")
         
         # Sử dụng Gemini để dịch
-        model = genai.GenerativeModel(CHOSEN_MODEL)
+        print(f"🤖 Đang dùng model: {CHOSEN_MODEL}")
+        try:
+            model = genai.GenerativeModel(CHOSEN_MODEL)
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower() or "not supported" in error_msg.lower():
+                print(f"❌ Model {CHOSEN_MODEL} không tồn tại, đang tìm model thay thế...")
+                # Thử tìm model khác
+                available_models = []
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        m_name = m.name
+                        if ("gemini" in m_name.lower() and "gemma" not in m_name.lower() and
+                            "2.5" not in m_name and "exp" not in m_name.lower() and
+                            "latest" not in m_name.lower() and "preview" not in m_name.lower()):
+                            available_models.append(m_name)
+                if available_models:
+                    model = genai.GenerativeModel(available_models[0])
+                    print(f"✅ Đã chuyển sang model: {available_models[0]}")
+                else:
+                    raise RuntimeError(f"Không tìm thấy model khả dụng. Chi tiết: {error_msg[:200]}")
+            else:
+                raise
         prompt = f"Hãy dịch toàn bộ nội dung sau sang {language_name} ({target_language}). Giữ nguyên định dạng, cấu trúc và dấu thời gian (nếu có). Chỉ dịch nội dung, không thêm giải thích:\n\n{text}"
         
         safety = [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
