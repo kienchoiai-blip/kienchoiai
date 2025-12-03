@@ -530,8 +530,22 @@ Ví dụ format:
             try:
                 response = model.generate_content([uploaded_file, prompt], safety_settings=safety)
                 result = response.text if response.text else "Không có nội dung trả về."
-                # Force garbage collection sau khi generate content để giải phóng memory
+                
+                # ✅ QUAN TRỌNG: Xóa file từ Google NGAY SAU KHI CÓ KỊCH BẢN
+                # Không đợi đến finally, để giải phóng memory ngay lập tức
+                if uploaded_file:
+                    try:
+                        genai.delete_file(uploaded_file.name)
+                        print("🗑️ Đã xóa file từ Google ngay sau khi có kịch bản")
+                        uploaded_file = None  # Đánh dấu đã xóa
+                    except Exception as e:
+                        print(f"⚠️ Không thể xóa file từ Google: {e}")
+                
+                # Force garbage collection sau khi generate content và xóa file
                 gc.collect()
+                gc.collect()
+                
+                print("✅ Đã tạo kịch bản thành công (video đã được xóa, chỉ lưu kịch bản)")
                 return result
             except Exception as e:
                 error_msg = str(e)
@@ -560,11 +574,11 @@ Ví dụ format:
                         )
                 raise
     finally:
-        # Cleanup: Xóa uploaded file từ Google (nếu có thể)
+        # Cleanup: Xóa uploaded file từ Google (nếu chưa xóa ở trên)
         if uploaded_file:
             try:
                 genai.delete_file(uploaded_file.name)
-                print("🗑️ Đã xóa file từ Google")
+                print("🗑️ Đã xóa file từ Google (cleanup)")
             except:
                 pass
         # Force garbage collection nhiều lần sau khi cleanup để giải phóng memory tối đa
@@ -609,23 +623,45 @@ def analyze():
         mode = data.get("mode", "detailed")
         if not url: return jsonify({"error": "Thiếu URL"}), 400
 
+        print(f"📥 Bắt đầu xử lý video từ URL: {url}")
+        print("💡 LƯU Ý: Video sẽ KHÔNG được lưu lại, chỉ lưu kịch bản vào database")
+        
         video_path = download_video(url)
         script_text = analyze_video_with_gemini(video_path, mode=mode)
 
+        # ✅ LƯU KỊCH BẢN VÀO DATABASE (KHÔNG LƯU VIDEO)
+        print("💾 Đang lưu kịch bản vào database...")
         script_row = Script(user_id=user.id, video_url=url, script_content=script_text, mode=mode)
         db.session.add(script_row)
         db.session.commit()
-        log_script_to_csv(script_row, user.username)
+        print(f"✅ Đã lưu kịch bản vào database (ID: {script_row.id})")
+        
+        # Log vào CSV (optional, có thể bỏ qua nếu cần tiết kiệm memory)
+        try:
+            log_script_to_csv(script_row, user.username)
+        except Exception as e:
+            print(f"⚠️ Không thể log vào CSV: {e}")
 
-        # File đã được xóa trong analyze_video_with_gemini, nhưng đảm bảo cleanup
+        # ✅ Đảm bảo video đã được xóa (đã xóa trong analyze_video_with_gemini, nhưng kiểm tra lại)
         if os.path.exists(video_path):
             try:
                 os.remove(video_path)
-            except:
-                pass
+                print("🗑️ Đã xóa file video cuối cùng (đảm bảo cleanup)")
+                gc.collect()
+            except Exception as e:
+                print(f"⚠️ Không thể xóa file video: {e}")
+        
+        print("✅ Hoàn thành: Kịch bản đã được lưu, video đã được xóa")
         return jsonify({"script": script_text})
     except Exception as e:
         print(f"❌ LỖI: {e}")
+        # Đảm bảo cleanup nếu có lỗi
+        try:
+            if 'video_path' in locals() and os.path.exists(video_path):
+                os.remove(video_path)
+                gc.collect()
+        except:
+            pass
         return jsonify({"error": str(e)}), 500
 
 @app.route("/register", methods=["POST"])
