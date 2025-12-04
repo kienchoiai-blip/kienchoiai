@@ -333,6 +333,46 @@
                       </div>
                     </div>
                     <div class="flex items-center gap-2">
+                      <button id="editBtn" class="relative text-xs 
+                        bg-white/5 hover:bg-white/10 
+                        text-slate-300 hover:text-white 
+                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        active:scale-[0.97] transform
+                        group">
+                        <i class="fa-solid fa-pen text-xs transition-all duration-200 group-hover:text-yellow-400"></i>
+                        <span class="edit-text">Chỉnh sửa</span>
+                      </button>
+                      <button id="undoBtn" class="relative text-xs 
+                        bg-white/5 hover:bg-white/10 
+                        text-slate-300 hover:text-white 
+                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        active:scale-[0.97] transform
+                        group disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fa-solid fa-rotate-left text-xs transition-all duration-200 group-hover:text-blue-400"></i>
+                        <span>Quay lại</span>
+                      </button>
+                      <button id="redoBtn" class="relative text-xs 
+                        bg-white/5 hover:bg-white/10 
+                        text-slate-300 hover:text-white 
+                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        active:scale-[0.97] transform
+                        group disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fa-solid fa-rotate-right text-xs transition-all duration-200 group-hover:text-blue-400"></i>
+                        <span>Tiến lên</span>
+                      </button>
+                      <button id="saveBtn" class="relative text-xs 
+                        bg-white/5 hover:bg-white/10 
+                        text-slate-300 hover:text-white 
+                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        active:scale-[0.97] transform
+                        group hidden">
+                        <i class="fa-solid fa-floppy-disk text-xs transition-all duration-200 group-hover:text-green-400"></i>
+                        <span>Lưu</span>
+                      </button>
                       <button id="toggleTimestampBtn" class="relative text-xs 
                         bg-white/5 hover:bg-white/10 
                         text-slate-300 hover:text-white 
@@ -357,6 +397,16 @@
                           <i class="fa-solid fa-check text-[10px]"></i>
                           <span>Đã chép</span>
                         </span>
+                      </button>
+                      <button id="downloadBtn" class="relative text-xs 
+                        bg-white/5 hover:bg-white/10 
+                        text-slate-300 hover:text-white 
+                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        active:scale-[0.97] transform
+                        group">
+                        <i class="fa-solid fa-download text-xs transition-all duration-200 group-hover:text-purple-400"></i>
+                        <span>Tải xuống</span>
                       </button>
                     </div>
                   </div>
@@ -650,7 +700,12 @@
           translate: document.getElementById("translateBtn"),
           closeTranslateModal: document.getElementById("closeTranslateModal"),
           cancelTranslate: document.getElementById("cancelTranslate"),
-          confirmTranslate: document.getElementById("confirmTranslate")
+          confirmTranslate: document.getElementById("confirmTranslate"),
+          edit: document.getElementById("editBtn"),
+          undo: document.getElementById("undoBtn"),
+          redo: document.getElementById("redoBtn"),
+          save: document.getElementById("saveBtn"),
+          download: document.getElementById("downloadBtn")
         },
         translateModal: {
           modal: document.getElementById("translateModal"),
@@ -979,19 +1034,179 @@
       }
 
       UI.btns.toggleTimestamp.onclick = () => {
-        if (!window.originalScript) return;
+        // ✅ FIX: Dùng bản hiện tại (có thể là bản đã dịch) thay vì window.originalScript
+        const currentText = UI.result.output.value;
+        if (!currentText) return;
         
         window.showTimestamps = !window.showTimestamps;
         
         if (window.showTimestamps) {
-          // Hiện lại bản gốc có timestamp
-          UI.result.output.value = window.originalScript;
+          // Hiện lại bản có timestamp (dùng bản gốc nếu có, nếu không dùng bản hiện tại)
+          if (window.translatedScript) {
+            // Nếu đã dịch, dùng bản đã dịch có timestamp
+            UI.result.output.value = window.translatedScript;
+          } else if (window.originalScript) {
+            // Nếu chưa dịch, dùng bản gốc có timestamp
+            UI.result.output.value = window.originalScript;
+          }
         } else {
-          // Ẩn timestamp
-          UI.result.output.value = removeTimestamps(window.originalScript);
+          // Ẩn timestamp từ bản hiện tại
+          UI.result.output.value = removeTimestamps(currentText);
         }
         
         updateTimestampButton();
+      };
+
+      // --- UNDO/REDO STACK ---
+      window.editHistory = {
+        past: [],
+        present: null,
+        future: []
+      };
+      window.isEditing = false;
+
+      // --- EDIT FUNCTIONALITY ---
+      UI.btns.edit.onclick = () => {
+        if (!UI.result.output.value) return;
+        
+        window.isEditing = !window.isEditing;
+        const textarea = UI.result.output;
+        
+        if (window.isEditing) {
+          // Bật chế độ edit
+          textarea.readOnly = false;
+          textarea.classList.add('border', 'border-yellow-500/30');
+          UI.btns.edit.classList.add('bg-yellow-500/20', 'border-yellow-500/30');
+          UI.btns.edit.querySelector('.edit-text').textContent = 'Thoát chỉnh sửa';
+          UI.btns.save.classList.remove('hidden');
+          UI.btns.undo.disabled = false;
+          UI.btns.redo.disabled = false;
+          
+          // Khởi tạo history với bản hiện tại
+          window.editHistory.present = textarea.value;
+          window.editHistory.past = [];
+          window.editHistory.future = [];
+          
+          // Lắng nghe thay đổi để lưu vào history
+          textarea.addEventListener('input', handleEditInput);
+        } else {
+          // Tắt chế độ edit
+          textarea.readOnly = true;
+          textarea.classList.remove('border', 'border-yellow-500/30');
+          UI.btns.edit.classList.remove('bg-yellow-500/20', 'border-yellow-500/30');
+          UI.btns.edit.querySelector('.edit-text').textContent = 'Chỉnh sửa';
+          UI.btns.save.classList.add('hidden');
+          UI.btns.undo.disabled = true;
+          UI.btns.redo.disabled = true;
+          
+          textarea.removeEventListener('input', handleEditInput);
+        }
+      };
+
+      function handleEditInput() {
+        const current = UI.result.output.value;
+        if (current !== window.editHistory.present) {
+          // Lưu bản cũ vào past
+          window.editHistory.past.push(window.editHistory.present);
+          // Giới hạn history (tối đa 50 bản)
+          if (window.editHistory.past.length > 50) {
+            window.editHistory.past.shift();
+          }
+          // Xóa future khi có thay đổi mới
+          window.editHistory.future = [];
+          // Cập nhật present
+          window.editHistory.present = current;
+          
+          // Cập nhật nút undo/redo
+          UI.btns.undo.disabled = window.editHistory.past.length === 0;
+          UI.btns.redo.disabled = window.editHistory.future.length === 0;
+        }
+      }
+
+      // --- UNDO/REDO ---
+      UI.btns.undo.onclick = () => {
+        if (window.editHistory.past.length === 0) return;
+        
+        // Lưu bản hiện tại vào future
+        window.editHistory.future.unshift(window.editHistory.present);
+        // Lấy bản trước đó
+        window.editHistory.present = window.editHistory.past.pop();
+        
+        // Cập nhật textarea
+        UI.result.output.value = window.editHistory.present;
+        
+        // Cập nhật nút
+        UI.btns.undo.disabled = window.editHistory.past.length === 0;
+        UI.btns.redo.disabled = false;
+      };
+
+      UI.btns.redo.onclick = () => {
+        if (window.editHistory.future.length === 0) return;
+        
+        // Lưu bản hiện tại vào past
+        window.editHistory.past.push(window.editHistory.present);
+        // Lấy bản tiếp theo
+        window.editHistory.present = window.editHistory.future.shift();
+        
+        // Cập nhật textarea
+        UI.result.output.value = window.editHistory.present;
+        
+        // Cập nhật nút
+        UI.btns.redo.disabled = window.editHistory.future.length === 0;
+        UI.btns.undo.disabled = false;
+      };
+
+      // --- SAVE ---
+      UI.btns.save.onclick = () => {
+        if (!UI.result.output.value) return;
+        
+        // Cập nhật bản gốc/đã dịch với bản đã chỉnh sửa
+        if (window.translatedScript) {
+          window.translatedScript = UI.result.output.value;
+        } else if (window.originalScript) {
+          window.originalScript = UI.result.output.value;
+        }
+        
+        // Tắt chế độ edit
+        UI.btns.edit.click();
+        
+        alert('✅ Đã lưu thay đổi!');
+      };
+
+      // --- DOWNLOAD ---
+      UI.btns.download.onclick = () => {
+        if (!UI.result.output.value) {
+          alert('⚠️ Không có nội dung để tải xuống!');
+          return;
+        }
+        
+        // Prompt để đặt tên file
+        const defaultName = `kich-ban-${new Date().toISOString().split('T')[0]}.txt`;
+        const fileName = prompt('Nhập tên file (không cần .txt):', defaultName.replace('.txt', ''));
+        
+        if (!fileName) return; // User hủy
+        
+        // Tạo file và download
+        const content = UI.result.output.value;
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName.endsWith('.txt') ? fileName : `${fileName}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        // ✅ Xóa kịch bản khỏi hệ thống sau khi tải
+        UI.result.output.value = '';
+        UI.result.section.classList.add('hidden');
+        UI.result.empty.classList.remove('hidden');
+        window.originalScript = null;
+        window.translatedScript = null;
+        window.editHistory = { past: [], present: null, future: [] };
+        
+        alert('✅ Đã tải xuống và xóa kịch bản khỏi hệ thống!');
       };
 
       UI.btns.copy.onclick = async () => {
@@ -1578,9 +1793,10 @@
           await animateProgressTo(100, "Hoàn thành!", 500);
           await sleep(500);
 
-          // Hiển thị kết quả dịch (giữ nguyên bản gốc tiếng Việt trong window.originalScript)
+          // ✅ FIX: Lưu bản đã dịch vào window.translatedScript để toggle timestamp đúng
+          window.translatedScript = data.translated_text; // Lưu bản đã dịch có timestamp
           UI.result.output.value = data.translated_text;
-          // Không cập nhật window.originalScript - giữ nguyên bản gốc tiếng Việt
+          // Giữ nguyên window.originalScript (bản gốc tiếng Việt) để có thể quay lại
           window.showTimestamps = true; // Reset timestamp toggle
           updateTimestampButton();
 
