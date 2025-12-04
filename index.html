@@ -52,6 +52,11 @@
         50% { background-position: 100% 50%; }
       }
       
+      @keyframes animate-gradient {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+      }
+      
       @keyframes float {
         0%, 100% { transform: translateY(0px) rotate(0deg); }
         50% { transform: translateY(-20px) rotate(5deg); }
@@ -60,6 +65,11 @@
       @keyframes shimmer {
         0% { background-position: -1000px 0; }
         100% { background-position: 1000px 0; }
+      }
+      
+      @keyframes animate-shimmer {
+        0% { transform: translateX(-100%) skewX(-12deg); }
+        100% { transform: translateX(200%) skewX(-12deg); }
       }
 
       @keyframes purple-glow {
@@ -309,7 +319,13 @@
               <h1 class="font-display font-bold text-xl tracking-tight text-white leading-none">
                 <span class="text-gradient">ViE</span><span class="text-white">SCRIPT</span>
         </h1>
-              <p class="text-[10px] text-slate-500 font-medium tracking-widest uppercase mt-0.5">Studio Kịch Bản AI</p>
+              <p class="text-[10px] text-slate-500 font-medium tracking-widest uppercase mt-0.5 flex items-center gap-2">
+                <span>Studio Kịch Bản AI</span>
+                <span class="text-[9px] font-normal normal-case flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30 shadow-sm">
+                  <i class="fa-solid fa-star text-[8px] text-yellow-400 animate-pulse"></i>
+                  <span class="font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">Kiên Chơi Ai</span>
+                </span>
+              </p>
             </div>
           </div>
 
@@ -420,11 +436,34 @@
                       hover:border-blue-500/50 hover:bg-dark-800/60
                       active:scale-[0.98]">
                       <input type="radio" name="scriptMode" value="detailed" class="peer hidden" checked />
-                      <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0 
+                      <div class="w-14 h-14 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 
                         peer-checked:bg-gradient-to-br peer-checked:from-blue-500 peer-checked:to-indigo-600 
-                        peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-blue-500/50
-                        transition-all duration-300 transform peer-checked:scale-110">
-                        <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+                        peer-checked:shadow-lg peer-checked:shadow-blue-500/50
+                        transition-all duration-300 transform peer-checked:scale-110 relative overflow-hidden border border-blue-500/20 peer-checked:border-blue-400/50">
+                        <!-- SVG Logo: Document + Camera + Sparkles -->
+                        <svg viewBox="0 0 48 48" class="w-10 h-10 absolute z-10">
+                          <!-- Document Background -->
+                          <rect x="8" y="6" width="24" height="32" rx="2" fill="rgba(255,255,255,0.95)" class="peer-checked:fill-white"/>
+                          <!-- Camera Icon -->
+                          <rect x="14" y="12" width="12" height="8" rx="1" fill="#3b82f6" class="peer-checked:fill-white"/>
+                          <circle cx="20" cy="16" r="2.5" fill="white" class="peer-checked:fill-blue-500"/>
+                          <rect x="16" y="20" width="8" height="2" rx="1" fill="#3b82f6" class="peer-checked:fill-white"/>
+                          <!-- Sparkles -->
+                          <circle cx="28" cy="10" r="1.5" fill="#fbbf24">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
+                          </circle>
+                          <circle cx="30" cy="14" r="1" fill="#60a5fa">
+                            <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+                          </circle>
+                          <circle cx="26" cy="28" r="1.2" fill="#a78bfa">
+                            <animate attributeName="opacity" values="0.4;1;0.4" dur="1.8s" repeatCount="indefinite"/>
+                          </circle>
+                          <!-- Lines (script content) -->
+                          <line x1="14" y1="24" x2="22" y2="24" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" class="peer-checked:stroke-white"/>
+                          <line x1="14" y1="28" x2="20" y2="28" stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round" class="peer-checked:stroke-white"/>
+                        </svg>
+                        <div class="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-indigo-500/20 peer-checked:from-blue-400/40 peer-checked:to-indigo-500/40"></div>
+                        <div class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-yellow-400 peer-checked:animate-pulse shadow-lg shadow-yellow-400/50"></div>
                       </div>
                       <div class="flex-1">
                         <div class="flex items-center gap-2">
@@ -449,12 +488,39 @@
                       hover:border-purple-500/50 hover:bg-dark-800/60
                       active:scale-[0.98]">
                       <input type="radio" name="scriptMode" value="transcript" class="peer hidden" />
-                      <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 shrink-0 
+                      <div class="w-14 h-14 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 
                         peer-checked:bg-gradient-to-br peer-checked:from-purple-500 peer-checked:to-pink-600 
-                        peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-purple-500/50
-                        transition-all duration-300 transform peer-checked:scale-110">
-                        <i class="fa-solid fa-closed-captioning text-sm"></i>
-        </div>
+                        peer-checked:shadow-lg peer-checked:shadow-purple-500/50
+                        transition-all duration-300 transform peer-checked:scale-110 relative overflow-hidden border border-purple-500/20 peer-checked:border-purple-400/50">
+                        <!-- SVG Logo: Microphone + Sound Waves + Subtitle Lines -->
+                        <svg viewBox="0 0 48 48" class="w-10 h-10 absolute z-10">
+                          <!-- Microphone Base -->
+                          <rect x="18" y="8" width="12" height="18" rx="2" fill="#a855f7" class="peer-checked:fill-white"/>
+                          <rect x="20" y="10" width="8" height="12" rx="1" fill="white" class="peer-checked:fill-purple-500"/>
+                          <!-- Microphone Stand -->
+                          <line x1="24" y1="26" x2="24" y2="32" stroke="#a855f7" stroke-width="2" stroke-linecap="round" class="peer-checked:stroke-white"/>
+                          <line x1="20" y1="32" x2="28" y2="32" stroke="#a855f7" stroke-width="2" stroke-linecap="round" class="peer-checked:stroke-white"/>
+                          <!-- Sound Waves (Left) -->
+                          <path d="M 10 18 Q 12 16, 12 20 T 10 22" stroke="#ec4899" stroke-width="2" fill="none" stroke-linecap="round" class="peer-checked:stroke-white">
+                            <animate attributeName="opacity" values="0.5;1;0.5" dur="1.2s" repeatCount="indefinite"/>
+                          </path>
+                          <path d="M 8 18 Q 10 14, 10 20 T 8 22" stroke="#ec4899" stroke-width="2" fill="none" stroke-linecap="round" class="peer-checked:stroke-white">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
+                          </path>
+                          <!-- Sound Waves (Right) -->
+                          <path d="M 38 18 Q 36 16, 36 20 T 38 22" stroke="#ec4899" stroke-width="2" fill="none" stroke-linecap="round" class="peer-checked:stroke-white">
+                            <animate attributeName="opacity" values="0.5;1;0.5" dur="1.2s" repeatCount="indefinite"/>
+                          </path>
+                          <path d="M 40 18 Q 38 14, 38 20 T 40 22" stroke="#ec4899" stroke-width="2" fill="none" stroke-linecap="round" class="peer-checked:stroke-white">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
+                          </path>
+                          <!-- Subtitle Lines (Bottom) -->
+                          <rect x="12" y="36" width="24" height="3" rx="1.5" fill="#a855f7" class="peer-checked:fill-white"/>
+                          <rect x="14" y="40" width="20" height="3" rx="1.5" fill="#ec4899" class="peer-checked:fill-white"/>
+                        </svg>
+                        <div class="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-pink-500/20 peer-checked:from-purple-400/40 peer-checked:to-pink-500/40"></div>
+                        <div class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-pink-400 peer-checked:animate-pulse shadow-lg shadow-pink-400/50"></div>
+                      </div>
                       <div class="flex-1">
                         <div class="flex items-center gap-2">
                           <span class="block text-sm font-bold text-slate-200 peer-checked:text-white transition-colors">Chỉ Lấy Lời Thoại</span>
@@ -510,22 +576,20 @@
                       <button id="undoBtn" class="relative text-xs 
                         bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
-                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
+                        w-9 h-9 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center justify-center border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm" disabled>
-                        <i class="fa-solid fa-arrow-left text-xs transition-all duration-200 group-hover:text-purple-300"></i>
-                        <span>Quay lại</span>
+                        group disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm" disabled title="Quay lại">
+                        <i class="fa-solid fa-arrow-left text-sm transition-all duration-200 group-hover:text-purple-300"></i>
                       </button>
                       <button id="redoBtn" class="relative text-xs 
                         bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
-                        px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
+                        w-9 h-9 rounded-lg transition-all duration-200 font-medium 
+                        flex items-center justify-center border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm" disabled>
-                        <i class="fa-solid fa-arrow-right text-xs transition-all duration-200 group-hover:text-purple-300"></i>
-                        <span>Tiến lên</span>
+                        group disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm" disabled title="Tiến lên">
+                        <i class="fa-solid fa-arrow-right text-sm transition-all duration-200 group-hover:text-purple-300"></i>
                       </button>
                       <button id="saveBtn" class="relative text-xs 
                         bg-purple-500/10 hover:bg-purple-500/20 
@@ -581,7 +645,7 @@
                   </div>
 
                   <!-- Stats Footer -->
-                  <div class="bg-gradient-to-r from-dark-800/60 via-dark-800/50 to-dark-800/60 backdrop-blur-sm border-t border-white/5 px-6 py-3 flex items-center justify-between gap-4 text-xs">
+                  <div class="bg-gradient-to-r from-dark-800/60 via-dark-800/50 to-dark-800/60 backdrop-blur-sm border-t border-white/5 px-6 py-3 flex items-center justify-between gap-4 text-xs relative">
                     <div class="flex items-center gap-6">
                       <div class="flex items-center gap-2">
                         <span class="text-slate-500 font-medium">Số từ:</span>
@@ -592,32 +656,69 @@
                         <span id="duration" class="text-blue-400 font-bold">—</span>
                       </div>
                     </div>
-                    <button id="translateBtn" class="font-bold text-purple-400 hover:text-purple-300 px-3 py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/30 uppercase text-[10px] transition-all cursor-pointer flex items-center gap-1.5">
-                      <i class="fa-solid fa-language"></i>
-                      <span id="tone">DỊCH THUẬT</span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                      <!-- Watermark RẤT NỔI BẬT -->
+                      <div class="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-lg bg-gradient-to-r from-purple-500/20 via-indigo-500/20 to-pink-500/20 border border-purple-400/30 hover:bg-gradient-to-r hover:from-purple-500/30 hover:via-indigo-500/30 hover:to-pink-500/30 hover:border-purple-400/50 transition-all duration-300 cursor-default group shadow-md shadow-purple-500/10">
+                        <i class="fa-solid fa-crown text-[10px] text-yellow-400 group-hover:text-yellow-300 transition-colors"></i>
+                        <span class="text-[10px] font-semibold text-slate-300 group-hover:text-white transition-colors">bởi</span>
+                        <span class="text-[11px] font-extrabold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent group-hover:from-purple-200 group-hover:to-pink-200 transition-all">Kiên Chơi Ai</span>
+                      </div>
+                      <button id="translateBtn" class="font-bold text-purple-400 hover:text-purple-300 px-3 py-1.5 rounded bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/30 uppercase text-[10px] transition-all cursor-pointer flex items-center gap-1.5">
+                        <i class="fa-solid fa-language"></i>
+                        <span id="tone">DỊCH THUẬT</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
               
               <!-- Placeholder when no result -->
-              <div id="emptyState" class="h-full min-h-[400px] glass rounded-3xl border border-white/5 flex flex-col items-center justify-center text-slate-600 gap-4 p-8">
-                <div class="w-20 h-20 rounded-3xl bg-dark-800 flex items-center justify-center border border-white/5">
-                  <i class="fa-solid fa-wand-magic-sparkles text-3xl opacity-20"></i>
+              <div id="emptyState" class="h-full min-h-[400px] glass rounded-3xl border border-white/5 flex flex-col items-center justify-center text-slate-600 gap-6 p-8 relative">
+                <!-- Logo ViESCRIPT đẹp -->
+                <div class="relative mb-2">
+                  <div class="w-32 h-32 rounded-3xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-2xl shadow-purple-500/50 relative overflow-hidden group">
+                    <!-- Animated background glow -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-indigo-400/30 via-purple-400/30 to-pink-400/30 animate-pulse"></div>
+                    <!-- Logo SVG -->
+                    <svg viewBox="0 0 80 80" class="w-20 h-20 relative z-10">
+                      <!-- Document/Script -->
+                      <rect x="20" y="12" width="40" height="56" rx="4" fill="rgba(255,255,255,0.95)" />
+                      <line x1="28" y1="24" x2="52" y2="24" stroke="#6366f1" stroke-width="3" stroke-linecap="round" />
+                      <line x1="28" y1="34" x2="48" y2="34" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" />
+                      <line x1="28" y1="44" x2="52" y2="44" stroke="#ec4899" stroke-width="3" stroke-linecap="round" />
+                      <line x1="28" y1="54" x2="45" y2="54" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" />
+                      <!-- AI Sparkles -->
+                      <circle cx="56" cy="20" r="5" fill="#fbbf24" opacity="0.9">
+                        <animate attributeName="opacity" values="0.9;0.3;0.9" dur="2s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx="60" cy="28" r="3" fill="#60a5fa" opacity="0.8">
+                        <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx="52" cy="56" r="4" fill="#a78bfa" opacity="0.7">
+                        <animate attributeName="opacity" values="0.7;0.3;0.7" dur="1.8s" repeatCount="indefinite" />
+                      </circle>
+                    </svg>
+                    <!-- Shine effect -->
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
+                  </div>
+                  <!-- Floating particles -->
+                  <div class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 animate-pulse shadow-lg shadow-yellow-500/50"></div>
+                  <div class="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 animate-pulse shadow-lg shadow-blue-500/50" style="animation-delay: 0.5s;"></div>
                 </div>
                 <div class="text-center max-w-xs">
-                  <div class="relative mb-4">
-                    <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/30 via-purple-500/30 to-pink-500/30 flex items-center justify-center backdrop-blur-xl border border-white/10 shadow-2xl mx-auto">
-                      <i class="fa-solid fa-file-lines text-3xl text-transparent bg-clip-text bg-gradient-to-br from-indigo-400 to-purple-400"></i>
-                    </div>
-                    <div class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 animate-pulse shadow-lg"></div>
-                  </div>
                   <h3 class="text-xl font-bold text-white mb-2 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Chưa có nội dung</h3>
                   <p class="text-sm text-slate-400 mb-4 leading-relaxed">Chọn chế độ và dán link video để AI bắt đầu phân tích kịch bản cho bạn.</p>
-                  <div class="flex gap-2 justify-center text-xs">
+                  <div class="flex flex-wrap gap-2 justify-center text-xs mb-6">
                     <span class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-slate-400">✨ AI Powered</span>
                     <span class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-slate-400">⚡ Nhanh chóng</span>
                     <span class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-slate-400">🎯 Chính xác</span>
+                  </div>
+                  <!-- Branding NỔI BẬT - Signature style -->
+                  <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-500/15 via-indigo-500/15 to-pink-500/15 border border-purple-400/25 hover:from-purple-500/25 hover:via-indigo-500/25 hover:to-pink-500/25 hover:border-purple-400/40 transition-all duration-300 group shadow-md shadow-purple-500/10">
+                    <i class="fa-solid fa-sparkles text-[9px] text-purple-400/70"></i>
+                    <span class="text-[10px] text-slate-300/80 font-medium">Tạo bởi</span>
+                    <span class="text-[10px] font-extrabold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">Kiên Chơi Ai</span>
+                    <i class="fa-solid fa-star text-[8px] text-yellow-400/70"></i>
                   </div>
                 </div>
               </div>
@@ -747,6 +848,16 @@
               </div>
             </div>
 
+            <!-- Branding Footer (RẤT NỔI BẬT) -->
+            <div class="absolute bottom-4 left-0 right-0 flex items-center justify-center">
+              <div class="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-purple-500/25 via-indigo-500/25 to-pink-500/25 border-2 border-purple-400/40 backdrop-blur-md hover:border-purple-400/60 hover:from-purple-500/35 hover:via-indigo-500/35 hover:to-pink-500/35 transition-all duration-300 group shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30">
+                <i class="fa-solid fa-sparkles text-sm text-purple-300 animate-pulse"></i>
+                <span class="text-xs font-semibold text-slate-200 group-hover:text-white transition-colors">Tạo bởi</span>
+                <span class="text-sm font-extrabold bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent animate-gradient bg-[length:200%_auto]">Kiên Chơi Ai</span>
+                <i class="fa-solid fa-star text-[10px] text-yellow-400/80 animate-pulse" style="animation-delay: 0.5s;"></i>
+              </div>
+            </div>
+            
             <!-- Status Text -->
             <h3 id="loadingTitle" class="text-xl font-bold text-white mb-2">Đang xử lý...</h3>
             <p id="loadingSubtitle" class="text-sm text-slate-400 mb-4">Vui lòng đợi trong giây lát</p>
@@ -1146,6 +1257,7 @@
           // Render
           // Lưu bản gốc (có timestamp) và hiển thị
           window.originalScript = data.script;
+          window.translatedScript = null; // Reset translated script
           window.showTimestamps = true; // Mặc định hiện timestamp
           UI.result.output.value = data.script;
           UI.result.section.classList.remove("hidden");
@@ -1160,7 +1272,10 @@
           UI.result.stats.time.textContent = "~" + Math.round(words/2.5) + "s";
           UI.result.stats.tone.textContent = mode === "transcript" ? "DỊCH THUẬT" : "SÁNG TẠO";
 
-          fetchHistory();
+          // ✅ THÊM VÀO LỊCH SỬ TẠM THỜI (KHÔNG LƯU DATABASE)
+          const historyItem = addToTempHistory(url, data.script, mode);
+          window.currentHistoryItemId = historyItem.id; // Lưu ID để có thể update sau khi save
+          renderTempHistory(); // Hiển thị lại lịch sử
           hideLoadingModal();
 
         } catch (e) {
@@ -1342,6 +1457,12 @@
           window.originalScript = UI.result.output.value;
         }
         
+        // ✅ CẬP NHẬT LỊCH SỬ TẠM THỜI (KHÔNG MẤT ĐI)
+        if (window.currentHistoryItemId) {
+          updateTempHistory(window.currentHistoryItemId, UI.result.output.value);
+          renderTempHistory(); // Hiển thị lại lịch sử đã cập nhật
+        }
+        
         // Tắt chế độ edit
         UI.btns.edit.click();
         
@@ -1377,15 +1498,17 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        // ✅ Xóa kịch bản khỏi hệ thống sau khi tải
+        // ✅ KHÔNG XÓA KHỎI LỊCH SỬ TẠM THỜI - CHỈ XÓA KHỎI UI
+        // Lịch sử tạm thời vẫn giữ lại để user có thể xem lại sau
         UI.result.output.value = '';
         UI.result.section.classList.add('hidden');
         UI.result.empty.classList.remove('hidden');
+        window.currentHistoryItemId = null; // Reset current item
         window.originalScript = null;
         window.translatedScript = null;
         window.editHistory = { past: [], present: null, future: [] };
         
-        alert('✅ Đã tải xuống và xóa kịch bản khỏi hệ thống!');
+        alert('✅ Đã tải xuống! Kịch bản vẫn còn trong lịch sử hoạt động.');
       };
 
       UI.btns.copy.onclick = async () => {
@@ -1436,73 +1559,129 @@
         }
       };
 
-      async function fetchHistory() {
+      // --- LỊCH SỬ TẠM THỜI (KHÔNG LƯU DATABASE) ---
+      const TEMP_HISTORY_KEY = "viescript_temp_history";
+      
+      function getTempHistory() {
         try {
-          const res = await fetch(`${API_BASE}/api/get_history`, {
-            headers: { "Authorization": `Bearer ${auth.getToken()}` }
-          });
-          if (res.status === 401) return auth.clear(), checkState();
+          const stored = localStorage.getItem(TEMP_HISTORY_KEY);
+          return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+          return [];
+        }
+      }
+      
+      function saveTempHistory(history) {
+        try {
+          localStorage.setItem(TEMP_HISTORY_KEY, JSON.stringify(history));
+        } catch (e) {
+          console.error("Lỗi lưu lịch sử tạm thời:", e);
+        }
+      }
+      
+      function addToTempHistory(videoUrl, scriptContent, mode) {
+        const history = getTempHistory();
+        const newItem = {
+          id: Date.now(),
+          video_url: videoUrl,
+          script_content: scriptContent,
+          mode: mode,
+          created_at: new Date().toISOString()
+        };
+        // Thêm vào đầu danh sách
+        history.unshift(newItem);
+        // Giới hạn tối đa 20 items
+        if (history.length > 20) {
+          history.pop();
+        }
+        saveTempHistory(history);
+        return newItem;
+      }
+      
+      function updateTempHistory(itemId, scriptContent) {
+        const history = getTempHistory();
+        const index = history.findIndex(item => item.id === itemId);
+        if (index !== -1) {
+          history[index].script_content = scriptContent;
+          saveTempHistory(history);
+        }
+      }
+      
+      function renderTempHistory() {
+        const history = getTempHistory();
+        UI.history.innerHTML = "";
+        
+        if (!history.length) {
+          UI.history.innerHTML = `
+            <div class="col-span-full h-32 flex flex-col items-center justify-center text-slate-600 gap-3 border border-dashed border-purple-500/20 rounded-2xl bg-purple-500/5">
+              <span class="text-xs font-medium opacity-50">Chưa có lịch sử nào</span>
+            </div>`;
+          return;
+        }
+
+        history.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "group p-4 rounded-2xl bg-purple-500/5 hover:bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 cursor-pointer transition-all duration-200 shadow-sm hover:-translate-y-1 backdrop-blur-sm";
           
-          const data = await res.json();
-          UI.history.innerHTML = "";
+          const date = new Date(item.created_at);
+          const dateStr = date.toLocaleDateString("vi-VN", {day:'2-digit', month:'2-digit'});
+          const timeStr = date.toLocaleTimeString("vi-VN", {hour:'2-digit', minute:'2-digit'});
           
-          if (!data.items?.length) {
-            UI.history.innerHTML = `
-              <div class="col-span-full h-32 flex flex-col items-center justify-center text-slate-600 gap-3 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
-                <span class="text-xs font-medium opacity-50">Chưa có lịch sử nào</span>
-              </div>`;
-            return;
-          }
+          const isTrans = item.mode === 'transcript';
+          const badgeClass = isTrans 
+            ? "text-purple-400 bg-purple-500/20 border-purple-500/30" 
+            : "text-blue-400 bg-blue-500/20 border-blue-500/30";
 
-          data.items.forEach(item => {
-            const div = document.createElement("div");
-            div.className = "group p-4 rounded-2xl bg-dark-800/40 hover:bg-dark-800/80 border border-white/5 hover:border-blue-500/30 cursor-pointer transition-all duration-200 shadow-sm hover:-translate-y-1";
-            
-            const date = new Date(item.created_at);
-            const dateStr = date.toLocaleDateString("vi-VN", {day:'2-digit', month:'2-digit'});
-            
-            const isTrans = item.mode === 'transcript';
-            const badgeClass = isTrans 
-              ? "text-purple-400 bg-purple-500/10" 
-              : "text-blue-400 bg-blue-500/10";
+          // Lấy tiêu đề từ script (dòng đầu tiên có **)
+          const titleMatch = item.script_content.match(/\*\*(.+?)\*\*/);
+          const title = titleMatch ? titleMatch[1] : item.script_content.substring(0, 50) + "...";
+          const preview = item.script_content.replace(/\*\*.*?\*\*\s*/, '').substring(0, 80);
 
-            div.innerHTML = `
-              <div class="flex justify-between items-start mb-3">
-                <span class="text-[10px] font-bold px-2 py-1 rounded ${badgeClass}">
-                  ${isTrans ? 'DỊCH' : 'KỊCH BẢN'}
-                </span>
-                <span class="text-[10px] text-slate-600 font-medium group-hover:text-slate-500 transition-colors">${dateStr}</span>
-              </div>
-              <div class="text-xs text-slate-300 line-clamp-2 font-medium leading-relaxed mb-3 h-8 opacity-80 group-hover:opacity-100">
-                ${item.script_content.substring(0, 80)}...
-              </div>
-              <div class="text-[10px] text-slate-600 truncate flex items-center gap-1.5 pt-3 border-t border-white/5">
-                <i class="fa-solid fa-link"></i> ${item.video_url}
-              </div>
-            `;
+          div.innerHTML = `
+            <div class="flex justify-between items-start mb-3">
+              <span class="text-[10px] font-bold px-2 py-1 rounded border ${badgeClass}">
+                ${isTrans ? 'DỊCH' : 'KỊCH BẢN'}
+              </span>
+              <span class="text-[10px] text-slate-500 font-medium group-hover:text-slate-400 transition-colors">${dateStr} ${timeStr}</span>
+            </div>
+            <div class="text-xs font-bold text-white mb-2 line-clamp-1">${title}</div>
+            <div class="text-xs text-slate-400 line-clamp-2 font-medium leading-relaxed mb-3 h-10 opacity-80 group-hover:opacity-100">
+              ${preview}...
+            </div>
+            <div class="text-[10px] text-slate-600 truncate flex items-center gap-1.5 pt-3 border-t border-purple-500/10">
+              <i class="fa-solid fa-link text-purple-400"></i> <span class="truncate">${item.video_url}</span>
+            </div>
+          `;
+          
+          div.onclick = () => {
+            // Lưu bản gốc và reset toggle
+            window.originalScript = item.script_content;
+            window.translatedScript = null; // Reset translated script
+            window.showTimestamps = true;
+            UI.result.output.value = item.script_content;
+            UI.result.section.classList.remove("hidden");
+            UI.result.empty.classList.add("hidden");
             
-            div.onclick = () => {
-              // Lưu bản gốc và reset toggle
-              window.originalScript = item.script_content;
-              window.showTimestamps = true;
-              UI.result.output.value = item.script_content;
-              UI.result.section.classList.remove("hidden");
-              UI.result.empty.classList.add("hidden");
-              
-              // Cập nhật nút toggle
-              updateTimestampButton();
-              
-              const words = item.script_content.split(/\s+/).length;
-              UI.result.stats.word.textContent = words;
-              UI.result.stats.time.textContent = "~" + Math.round(words/2.5) + "s";
-              UI.result.stats.tone.textContent = isTrans ? "DỊCH THUẬT" : "SÁNG TẠO";
-              
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
-            UI.history.appendChild(div);
-          });
+            // Cập nhật nút toggle
+            updateTimestampButton();
+            
+            const words = item.script_content.split(/\s+/).length;
+            UI.result.stats.word.textContent = words;
+            UI.result.stats.time.textContent = "~" + Math.round(words/2.5) + "s";
+            UI.result.stats.tone.textContent = isTrans ? "DỊCH THUẬT" : "SÁNG TẠO";
+            
+            // Lưu ID để có thể update sau khi save
+            window.currentHistoryItemId = item.id;
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          };
+          UI.history.appendChild(div);
+        });
+      }
 
-        } catch (e) { console.error(e); }
+      async function fetchHistory() {
+        // ✅ CHỈ HIỂN THỊ LỊCH SỬ TẠM THỜI (KHÔNG LẤY TỪ DATABASE)
+        renderTempHistory();
       }
 
       // --- ADMIN PANEL ---
@@ -1978,6 +2157,18 @@
           // Giữ nguyên window.originalScript (bản gốc tiếng Việt) để có thể quay lại
           window.showTimestamps = true; // Reset timestamp toggle
           updateTimestampButton();
+          
+          // ✅ CẬP NHẬT LỊCH SỬ TẠM THỜI NẾU ĐANG CÓ ITEM
+          if (window.currentHistoryItemId) {
+            updateTempHistory(window.currentHistoryItemId, data.translated_text);
+            renderTempHistory();
+          }
+          
+          // ✅ CẬP NHẬT LỊCH SỬ TẠM THỜI NẾU ĐANG CÓ ITEM
+          if (window.currentHistoryItemId) {
+            updateTempHistory(window.currentHistoryItemId, data.translated_text);
+            renderTempHistory();
+          }
 
           // Cập nhật badge
           UI.result.stats.tone.textContent = `${selectedLanguage.flag} ${selectedLanguage.code.toUpperCase()}`;
