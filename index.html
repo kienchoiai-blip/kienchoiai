@@ -62,16 +62,28 @@
         100% { background-position: 1000px 0; }
       }
 
+      @keyframes purple-glow {
+        0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3), 0 0 40px rgba(139, 92, 246, 0.2), 0 0 60px rgba(139, 92, 246, 0.1); }
+        50% { box-shadow: 0 0 30px rgba(139, 92, 246, 0.5), 0 0 60px rgba(139, 92, 246, 0.3), 0 0 90px rgba(139, 92, 246, 0.2); }
+      }
+      
+      @keyframes border-glow {
+        0%, 100% { border-color: rgba(139, 92, 246, 0.3); box-shadow: 0 0 10px rgba(139, 92, 246, 0.2); }
+        50% { border-color: rgba(139, 92, 246, 0.6); box-shadow: 0 0 20px rgba(139, 92, 246, 0.4), 0 0 30px rgba(139, 92, 246, 0.2); }
+      }
+
       body {
-        background: linear-gradient(135deg, #0a0a0c 0%, #1a0a1f 50%, #0a0a0c 100%);
-        background-size: 200% 200%;
-        animation: gradient-shift 15s ease infinite;
+        background: #000000 !important;
         background-image: 
-          radial-gradient(at 20% 30%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+          linear-gradient(135deg, #0a0a0c 0%, #1a0a1f 50%, #0a0a0c 100%),
+          radial-gradient(at 20% 30%, rgba(139, 92, 246, 0.2) 0px, transparent 50%),
           radial-gradient(at 80% 70%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
-          radial-gradient(at 50% 50%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+          radial-gradient(at 50% 50%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
+        background-size: 200% 200%, 100% 100%, 100% 100%, 100% 100%;
+        animation: gradient-shift 15s ease infinite;
         background-attachment: fixed;
         position: relative;
+        min-height: 100vh;
       }
       
       body::before {
@@ -82,11 +94,28 @@
         right: 0;
         bottom: 0;
         background: 
-          radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+          radial-gradient(circle at 20% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 50% 50%, rgba(192, 132, 252, 0.1) 0%, transparent 50%);
         pointer-events: none;
         z-index: 0;
         animation: float 20s ease-in-out infinite;
+        backdrop-filter: blur(100px);
+      }
+      
+      body::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+          radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.1) 0%, transparent 30%),
+          radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.1) 0%, transparent 30%);
+        pointer-events: none;
+        z-index: 0;
+        animation: float 25s ease-in-out infinite reverse;
       }
       
       ::-webkit-scrollbar { 
@@ -109,28 +138,35 @@
       }
 
       .glass {
-        background: rgba(18, 18, 22, 0.75);
-        backdrop-filter: blur(24px) saturate(180%);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(10, 10, 12, 0.8);
+        backdrop-filter: blur(40px) saturate(200%);
+        -webkit-backdrop-filter: blur(40px) saturate(200%);
+        border: 1px solid rgba(139, 92, 246, 0.4);
         box-shadow: 
-          0 8px 32px rgba(0, 0, 0, 0.3),
-          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          0 8px 32px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(139, 92, 246, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 0 40px rgba(139, 92, 246, 0.1);
+        animation: border-glow 3s ease-in-out infinite;
       }
       
       .glass-card {
-        background: rgba(28, 28, 33, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(18, 18, 22, 0.8);
+        border: 1px solid rgba(139, 92, 246, 0.3);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        box-shadow: 
+          0 4px 16px rgba(0, 0, 0, 0.4),
+          0 0 20px rgba(139, 92, 246, 0.1);
+        backdrop-filter: blur(20px);
       }
       .glass-card:hover {
-        background: rgba(39, 39, 47, 0.85);
-        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(28, 28, 33, 0.9);
+        border-color: rgba(139, 92, 246, 0.6);
         transform: translateY(-4px);
         box-shadow: 
-          0 12px 32px rgba(0, 0, 0, 0.4),
-          0 0 0 1px rgba(99, 102, 241, 0.2);
+          0 12px 32px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(139, 92, 246, 0.4),
+          0 0 40px rgba(139, 92, 246, 0.2);
       }
 
       .text-gradient {
@@ -184,21 +220,27 @@
       }
 
       .custom-input {
-        background: rgba(18, 18, 22, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(10, 10, 12, 0.8);
+        border: 1px solid rgba(139, 92, 246, 0.3);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        box-shadow: 
+          0 2px 8px rgba(0, 0, 0, 0.3),
+          0 0 10px rgba(139, 92, 246, 0.1);
+        backdrop-filter: blur(20px);
       }
       .custom-input:hover {
-        border-color: rgba(99, 102, 241, 0.4);
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+        border-color: rgba(139, 92, 246, 0.5);
+        box-shadow: 
+          0 4px 12px rgba(139, 92, 246, 0.2),
+          0 0 20px rgba(139, 92, 246, 0.15);
       }
       .custom-input:focus {
-        background: rgba(18, 18, 22, 0.9);
-        border-color: #6366f1;
+        background: rgba(10, 10, 12, 0.95);
+        border-color: rgba(139, 92, 246, 0.8);
         box-shadow: 
-          0 0 0 3px rgba(99, 102, 241, 0.2),
-          0 4px 16px rgba(99, 102, 241, 0.3);
+          0 0 0 3px rgba(139, 92, 246, 0.3),
+          0 4px 20px rgba(139, 92, 246, 0.4),
+          0 0 40px rgba(139, 92, 246, 0.2);
         outline: none;
       }
       
@@ -243,7 +285,7 @@
     <div class="min-h-screen flex flex-col">
       
       <!-- HEADER -->
-      <header class="glass sticky top-0 z-50 border-b border-white/5">
+      <header class="glass sticky top-0 z-50 border-b-2 border-purple-500/40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" id="homeLogo">
             <!-- Logo SVG: Script Document với AI Sparkles -->
@@ -291,7 +333,7 @@
         
         <!-- LOGIN VIEW -->
         <section id="authView" class="max-w-md mx-auto mt-10 lg:mt-20 animate-fade-in">
-          <div class="glass rounded-3xl p-8 sm:p-10 shadow-2xl">
+          <div class="glass rounded-3xl p-8 sm:p-10 shadow-2xl border-2 border-purple-500/40">
             <div class="text-center mb-8">
               <h2 class="font-display text-2xl font-bold text-white mb-2">Chào mừng trở lại</h2>
               <p class="text-sm text-slate-400">Đăng nhập để quản lý kịch bản của bạn</p>
@@ -347,7 +389,7 @@
           <div class="grid lg:grid-cols-12 gap-6">
             <!-- Input Area (Left/Top) -->
             <div class="lg:col-span-5 xl:col-span-4 space-y-6">
-              <div class="glass rounded-3xl p-6 border border-white/5">
+              <div class="glass rounded-3xl p-6 border-2 border-purple-500/40">
                 <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
                   <i class="fa-solid fa-sliders text-blue-400"></i> Cấu hình
                 </h2>
@@ -442,7 +484,7 @@
             <!-- Result Area (Right/Center - Priority) -->
             <div class="lg:col-span-7 xl:col-span-8">
               <div id="resultSection" class="hidden h-full flex flex-col animate-fade-in">
-                <div class="glass rounded-3xl flex-1 flex flex-col overflow-hidden border border-white/5 shadow-2xl min-h-[500px]">
+                <div class="glass rounded-3xl flex-1 flex flex-col overflow-hidden border-2 border-purple-500/40 shadow-2xl min-h-[500px]">
                   <!-- Toolbar -->
                   <div class="px-6 py-4 border-b border-white/5 bg-gradient-to-r from-white/[0.02] via-white/[0.03] to-white/[0.02] backdrop-blur-sm flex items-center justify-between">
                     <div class="flex items-center gap-3">
@@ -456,62 +498,62 @@
                     </div>
                     <div class="flex items-center gap-2">
                       <button id="editBtn" class="relative text-xs 
-                        bg-white/5 hover:bg-white/10 
+                        bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
                         px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group">
+                        group backdrop-blur-sm">
                         <i class="fa-solid fa-pen text-xs transition-all duration-200 group-hover:text-yellow-400"></i>
                         <span class="edit-text">Chỉnh sửa</span>
                       </button>
                       <button id="undoBtn" class="relative text-xs 
-                        bg-white/5 hover:bg-white/10 
+                        bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
                         px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        <i class="fa-solid fa-arrow-left text-xs transition-all duration-200 group-hover:text-blue-400"></i>
+                        group disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm" disabled>
+                        <i class="fa-solid fa-arrow-left text-xs transition-all duration-200 group-hover:text-purple-300"></i>
                         <span>Quay lại</span>
                       </button>
                       <button id="redoBtn" class="relative text-xs 
-                        bg-white/5 hover:bg-white/10 
+                        bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
                         px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        <i class="fa-solid fa-arrow-right text-xs transition-all duration-200 group-hover:text-blue-400"></i>
+                        group disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm" disabled>
+                        <i class="fa-solid fa-arrow-right text-xs transition-all duration-200 group-hover:text-purple-300"></i>
                         <span>Tiến lên</span>
                       </button>
                       <button id="saveBtn" class="relative text-xs 
-                        bg-white/5 hover:bg-white/10 
+                        bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
                         px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group hidden">
+                        group hidden backdrop-blur-sm">
                         <i class="fa-solid fa-floppy-disk text-xs transition-all duration-200 group-hover:text-green-400"></i>
                         <span>Lưu</span>
                       </button>
                       <button id="toggleTimestampBtn" class="relative text-xs 
-                        bg-white/5 hover:bg-white/10 
+                        bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
                         px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group">
-                        <i class="fa-solid fa-clock text-xs transition-all duration-200 group-hover:text-blue-400"></i>
+                        group backdrop-blur-sm">
+                        <i class="fa-solid fa-clock text-xs transition-all duration-200 group-hover:text-purple-300"></i>
                         <span class="timestamp-text">Ẩn thời gian</span>
                       </button>
                       <button id="copyBtn" class="relative text-xs 
-                        bg-white/5 hover:bg-white/10 
+                        bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
                         px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group overflow-hidden">
+                        group overflow-hidden backdrop-blur-sm">
                         <i class="fa-regular fa-copy text-xs transition-all duration-200 group-hover:text-emerald-400"></i>
                         <span class="copy-text">Sao chép</span>
                         <span class="copy-success hidden absolute inset-0 items-center justify-center gap-1.5 
@@ -521,13 +563,13 @@
                         </span>
                       </button>
                       <button id="downloadBtn" class="relative text-xs 
-                        bg-white/5 hover:bg-white/10 
+                        bg-purple-500/10 hover:bg-purple-500/20 
                         text-slate-300 hover:text-white 
                         px-3.5 py-2 rounded-lg transition-all duration-200 font-medium 
-                        flex items-center gap-2 border border-white/10 hover:border-white/20
+                        flex items-center gap-2 border border-purple-500/30 hover:border-purple-500/50
                         active:scale-[0.97] transform
-                        group">
-                        <i class="fa-solid fa-download text-xs transition-all duration-200 group-hover:text-purple-400"></i>
+                        group backdrop-blur-sm">
+                        <i class="fa-solid fa-download text-xs transition-all duration-200 group-hover:text-purple-300"></i>
                         <span>Tải xuống</span>
                       </button>
                     </div>
