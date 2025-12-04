@@ -421,15 +421,15 @@ def download_video(url: str) -> str:
             file_size_mb = file_size / (1024 * 1024)
             print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
             
-            # ✅ GIỚI HẠN 50MB - Đã tăng vì không còn lưu database lịch sử
+            # ✅ GIỚI HẠN 100MB - Đã tăng vì không còn lưu database lịch sử
             # Không còn lưu lịch sử vào database nên có thể xử lý video lớn hơn
-            if file_size_mb > 50:
+            if file_size_mb > 100:
                 os.remove(temp_name)  # Xóa ngay để giải phóng bộ nhớ
                 gc.collect()  # Force garbage collection
                 raise RuntimeError(
                     f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
                     "💡 Giải pháp:\n"
-                    "• Video nên nhỏ hơn 50MB để tránh lỗi timeout\n"
+                    "• Video nên nhỏ hơn 100MB để tránh lỗi timeout\n"
                     "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
                     "• Hoặc upgrade lên paid plan để xử lý video lớn hơn\n\n"
                     "📝 Lưu ý: Chỉ kịch bản được lưu, video KHÔNG được lưu lại"
@@ -453,13 +453,13 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # ✅ GIỚI HẠN 50MB - Đã tăng vì không còn lưu database lịch sử
+    # ✅ GIỚI HẠN 100MB - Đã tăng vì không còn lưu database lịch sử
     # Không còn lưu lịch sử vào database nên có thể xử lý video lớn hơn
-    if file_size_mb > 50:
+    if file_size_mb > 100:
         raise RuntimeError(
             f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
             "💡 Giải pháp:\n"
-            "• Video nên nhỏ hơn 50MB để tránh lỗi timeout\n"
+            "• Video nên nhỏ hơn 100MB để tránh lỗi timeout\n"
             "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
             "• Hoặc upgrade lên paid plan để xử lý video lớn hơn\n\n"
             "📝 Lưu ý: Chỉ kịch bản được lưu, video KHÔNG được lưu lại"
