@@ -2,7 +2,6 @@ import os
 import time
 import csv
 import re
-import gc  # Garbage collection để giải phóng memory
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -10,7 +9,6 @@ from flask_sqlalchemy import SQLAlchemy
 from yt_dlp import YoutubeDL
 from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
-from ftplib import FTP
 
 # ==========================================
 # 🔑 API KEY - CHỈ dùng environment variable (KHÔNG hardcode để tránh leak)
@@ -37,15 +35,15 @@ app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # ==========================================
-# DATABASE CONFIGURATION - PostgreSQL, MySQL hoặc SQLite
+# DATABASE CONFIGURATION - PostgreSQL hoặc SQLite
 # ==========================================
-# Production: Sử dụng PostgreSQL (Render) hoặc MySQL (hosting khác) từ DATABASE_URL
+# Trên Render: Sử dụng PostgreSQL (từ DATABASE_URL environment variable)
 # Local dev: Sử dụng SQLite (fallback nếu không có DATABASE_URL)
 # ==========================================
 
 # Lấy DATABASE_URL từ environment variable
-# Format PostgreSQL: postgresql://user:password@host:port/database
-# Format MySQL: mysql://user:password@host:port/database
+# Trên Render: Phải dùng "Internal Database URL" (không phải External)
+# Format: postgresql://user:password@host:port/database
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Nếu không có DATABASE_URL (local dev), dùng SQLite
@@ -61,20 +59,12 @@ if not DATABASE_URL:
     
     print(f"💾 Local dev: Sử dụng SQLite tại {DB_PATH}")
 else:
-    # Production: Sử dụng PostgreSQL hoặc MySQL
-    if DATABASE_URL.startswith("mysql"):
-        print(f"💾 Production: Sử dụng MySQL")
-    else:
-        print(f"💾 Production: Sử dụng PostgreSQL")
+    # Production: Sử dụng PostgreSQL
+    print(f"💾 Production: Sử dụng PostgreSQL")
     
     # Chuyển đổi postgres:// thành postgresql:// (cho SQLAlchemy)
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    
-    # Hỗ trợ MySQL: Chuyển đổi mysql:// thành mysql+pymysql:// (cho SQLAlchemy)
-    if DATABASE_URL.startswith("mysql://"):
-        DATABASE_URL = DATABASE_URL.replace("mysql://", "mysql+pymysql://", 1)
-        print(f"✅ Đã chuyển đổi MySQL connection string")
     
     # Kiểm tra và sửa Internal URL nếu cần
     # Render Internal URLs phải có .render.internal trong hostname
@@ -110,119 +100,42 @@ db = SQLAlchemy(app)
 def get_best_model_name():
     print("🔄 Đang quét danh sách Model khả dụng...")
     try:
-        # Lấy danh sách models và kiểm tra hỗ trợ generateContent
         available_models = []
-        all_models_info = []
-        
         for m in genai.list_models():
-            model_name = m.name
-            has_generate_content = 'generateContent' in m.supported_generation_methods
-            all_models_info.append((model_name, has_generate_content))
-            
-            if has_generate_content:
-                available_models.append(model_name)
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
         
-        print(f"📋 Tìm thấy {len(available_models)} models hỗ trợ generateContent (tổng {len(all_models_info)} models)")
+        # Ưu tiên gemini-1.5-flash (quota cao hơn cho free tier, không dùng gemini-2.5-pro)
+        # Loại bỏ các model không phù hợp trước
+        filtered_models = [m for m in available_models if "2.5" not in m and "latest" not in m.lower()]
         
-        # In ra tất cả models để debug (chỉ 10 models đầu)
-        print("📝 Danh sách models (10 đầu tiên):")
-        for i, (name, has_gen) in enumerate(all_models_info[:10]):
-            status = "✅" if has_gen else "❌"
-            print(f"   {status} {name}")
-        
-        # ✅ QUAN TRỌNG: CHỈ chọn model GEMINI (có "gemini" trong tên)
-        # Loại bỏ HOÀN TOÀN: gemma (text-only), 2.5, 2.0, exp, latest, preview, 3-pro
-        gemini_models = []
-        excluded_keywords = ["gemma", "2.5", "2.0", "exp", "latest", "preview", "3-pro"]
-        
-        for m in available_models:
-            m_lower = m.lower()
-            # CHỈ lấy model có "gemini" trong tên (KHÔNG phải gemma)
-            if "gemini" in m_lower and "gemma" not in m_lower:
-                # Loại bỏ các model có từ khóa không mong muốn
-                should_exclude = False
-                for keyword in excluded_keywords:
-                    if keyword in m_lower or keyword in m:
-                        should_exclude = True
-                        print(f"   ❌ Loại bỏ: {m} (có '{keyword}')")
-                        break
-                
-                if not should_exclude:
-                    gemini_models.append(m)
-                    print(f"   ✅ Giữ lại: {m}")
-        
-        print(f"📋 Sau khi lọc: {len(gemini_models)} models phù hợp")
-        
-        if not gemini_models:
-            print("⚠️ Không tìm thấy model gemini phù hợp sau khi lọc!")
-            print("📝 Danh sách tất cả models gemini có sẵn:")
-            for m in available_models:
-                if "gemini" in m.lower() and "gemma" not in m.lower():
-                    print(f"   - {m}")
-            # Fallback: Dùng model gemini đầu tiên có sẵn (NHƯNG VẪN LOẠI BỎ 2.5, 2.0, exp, latest, preview, 3-pro)
-            for m in available_models:
-                m_lower = m.lower()
-                if "gemini" in m_lower and "gemma" not in m_lower:
-                    # ✅ QUAN TRỌNG: Fallback cũng phải loại bỏ các model không mong muốn
-                    should_exclude = False
-                    for keyword in excluded_keywords:
-                        if keyword in m_lower or keyword in m:
-                            should_exclude = True
-                            break
-                    if not should_exclude:
-                        print(f"⚠️ Fallback: Dùng model đầu tiên tìm thấy (đã lọc): {m}")
-                        return m
-        
-        # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier, hỗ trợ video, nhẹ nhất)
-        # Thử các biến thể: flash, flash-001, flash-002, flash-latest
-        flash_variants = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-flash-002", "gemini-1.5-flash-latest"]
-        for variant in flash_variants:
-            for m in gemini_models:
-                if variant in m.lower(): 
-                    print(f"✅ Chọn model: {m} (tốt nhất cho free tier, hỗ trợ video, nhẹ nhất)")
-                    return m
-        
-        # Ưu tiên 2: gemini-1.5-pro (hỗ trợ video, nhưng nặng hơn flash)
-        for m in gemini_models:
-            if "gemini-1.5-pro" in m.lower() and "3" not in m: 
-                print(f"✅ Chọn model: {m} (hỗ trợ video)")
+        # Ưu tiên 1: gemini-1.5-flash
+        for m in filtered_models:
+            if "gemini-1.5-flash" in m: 
+                print(f"✅ Chọn model: {m} (tốt nhất cho free tier)")
                 return m
         
-        # Ưu tiên 3: gemini-pro (KHÔNG có latest, KHÔNG có 2.5, KHÔNG có 3, hỗ trợ video)
-        for m in gemini_models:
-            m_lower = m.lower()
-            if "gemini-pro" in m_lower and "2.5" not in m and "latest" not in m_lower and "3" not in m: 
-                print(f"✅ Chọn model: {m} (hỗ trợ video)")
+        # Ưu tiên 2: gemini-1.5-pro
+        for m in filtered_models:
+            if "gemini-1.5-pro" in m: 
+                print(f"✅ Chọn model: {m}")
                 return m
         
-        # Nếu vẫn còn model gemini trong danh sách, dùng model đầu tiên (đã được lọc)
-        if gemini_models:
-            selected = gemini_models[0]
-            print(f"✅ Dùng model gemini đầu tiên trong danh sách đã lọc: {selected}")
-            return selected
+        # Ưu tiên 3: gemini-pro (không có latest)
+        for m in filtered_models:
+            if "gemini-pro" in m and "latest" not in m.lower(): 
+                print(f"✅ Chọn model: {m}")
+                return m
             
+        if available_models: 
+            print(f"⚠️ Dùng model đầu tiên tìm được: {available_models[0]}")
+            return available_models[0]
     except Exception as e:
         print(f"⚠️ Lỗi quét model: {e}")
-        import traceback
-        traceback.print_exc()
     
-    # Fallback cuối cùng: Thử các model phổ biến
-    fallback_models = [
-        "models/gemini-1.5-flash-001",
-        "models/gemini-1.5-flash-002", 
-        "models/gemini-1.5-pro-001",
-        "models/gemini-pro",
-        "models/gemini-1.5-pro"
-    ]
-    
-    print("⚠️ Không tìm thấy model phù hợp, thử fallback models...")
-    for fallback in fallback_models:
-        print(f"   Thử: {fallback}")
-        # Không test ở đây, để code tự báo lỗi nếu model không tồn tại
-    
-    # Fallback cuối cùng: Dùng model 1.5-flash (KHÔNG BAO GIỜ dùng 2.5)
-    print("⚠️ Fallback: Sẽ dùng model gemini-1.5-flash (KHÔNG dùng 2.5)")
-    return "models/gemini-1.5-flash-001"  # Thử biến thể có số version
+    # Fallback: Dùng gemini-1.5-flash (không dùng 2.5-pro vì quota thấp)
+    print("✅ Fallback: Dùng gemini-1.5-flash")
+    return "models/gemini-1.5-flash"
 
 CHOSEN_MODEL = get_best_model_name()
 print(f"✅ ĐÃ CHỐT DÙNG MODEL: {CHOSEN_MODEL}")
@@ -242,18 +155,10 @@ class User(db.Model):
     scripts = db.relationship("Script", backref="user", lazy=True)
 
 class Script(db.Model):
-    """Model lưu lịch sử video đã xử lý
-    
-    LƯU Ý QUAN TRỌNG:
-    - video_url: Chỉ lưu URL (string, rất nhỏ ~100-200 bytes) - ĐỂ BIẾT VIDEO NÀO ĐÃ XỬ LÝ
-    - script_content: KHÔNG lưu (NULL) - ĐỂ TIẾT KIỆM MEMORY/DATABASE
-    - KHÔNG lưu video file vào database (video chỉ tồn tại tạm thời khi xử lý)
-    - User có thể xem danh sách video đã xử lý, nhưng không xem lại kịch bản cũ
-    """
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-    video_url = db.Column(db.String(1024), nullable=False)  # Chỉ lưu URL (string nhỏ)
-    script_content = db.Column(db.Text, nullable=True)  # KHÔNG lưu kịch bản (NULL) - tiết kiệm memory
+    video_url = db.Column(db.String(1024), nullable=False)
+    script_content = db.Column(db.Text, nullable=False)
     mode = db.Column(db.String(32), default="detailed", nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
@@ -281,11 +186,6 @@ def log_script_to_csv(script, username):
 
 with app.app_context():
     db.create_all()
-    
-    # ✅ KHÔNG CẦN MIGRATION - KHÔNG LƯU SCRIPT VÀO DATABASE NỮA
-    # Database chỉ lưu thông tin đăng nhập (User model)
-    # KHÔNG lưu: Video file, kịch bản, link video, lịch sử
-    
     admin_username = "admin"
     admin_password = "Admin123!"
     
@@ -307,172 +207,6 @@ with app.app_context():
         db.session.commit()
         print(f"⚙️ Đã RESET mật khẩu admin mặc định: {admin_username} / {admin_password}")
 
-# --- FTP HELPER FUNCTIONS ---
-def upload_video_to_ftp(local_file_path: str) -> str:
-    """
-    Upload video lên FTP hosting và trả về URL công khai
-    Dựa trên code mẫu từ Gemini
-    """
-    try:
-        ftp_host = os.getenv("FTP_HOST")
-        ftp_user = os.getenv("FTP_USER")
-        ftp_pass = os.getenv("FTP_PASS")
-        ftp_domain = os.getenv("FTP_DOMAIN", "").rstrip('/')
-        
-        if not all([ftp_host, ftp_user, ftp_pass]):
-            print("⚠️ FTP credentials chưa được cấu hình, bỏ qua upload FTP")
-            return None
-        
-        # Tạo tên file mới với timestamp để tránh trùng
-        # ✅ QUAN TRỌNG: TenTen Host kỵ file có dấu tiếng Việt hoặc khoảng trắng
-        # Đổi tên file thành dạng số để chắc chắn không bị lỗi ký tự
-        timestamp = int(time.time())
-        new_filename = f"video_{timestamp}.mp4"  # ✅ Tên file đơn giản, không có ký tự đặc biệt
-        
-        print(f"📤 Đang upload video lên FTP: {new_filename}")
-        print(f"🔐 Kết nối FTP: host={ftp_host}, user={ftp_user}")
-        
-        ftp = FTP()
-        ftp.set_pasv(True)  # Passive mode (quan trọng cho nhiều hosting)
-        ftp.connect(ftp_host, 21, timeout=30)  # Kết nối với timeout
-        ftp.login(ftp_user, ftp_pass)
-        
-        # 1. Vào thư mục public_html (BỎ DẤU / Ở ĐẦU - QUAN TRỌNG!)
-        # Không dùng "/public_html" vì sẽ tìm ở Server Root (không có quyền)
-        # Dùng "public_html" để tìm relative từ user root
-        try:
-            ftp.cwd("public_html")  # ✅ KHÔNG có dấu / ở đầu
-            print("✅ Đã vào thư mục public_html")
-        except Exception as e:
-            print(f"⚠️ Không tìm thấy public_html: {e}, thử root directory")
-            # Nếu không có public_html, ở lại root directory
-        
-        # 2. Vào tiếp thư mục videos (tạo nếu chưa có)
-        try:
-            ftp.cwd("videos")  # ✅ KHÔNG có dấu / ở đầu
-            print("✅ Đã vào thư mục videos")
-        except:
-            # Nếu chưa có thư mục videos, tạo mới
-            try:
-                ftp.mkd("videos")
-                print("✅ Đã tạo thư mục videos")
-                ftp.cwd("videos")
-            except Exception as e2:
-                print(f"⚠️ Không thể tạo thư mục videos: {e2}")
-                raise
-        
-        # Upload file
-        print(f"📤 Đang upload file: {local_file_path} -> {new_filename}")
-        with open(local_file_path, 'rb') as f:
-            ftp.storbinary(f'STOR {new_filename}', f, 4096)  # Buffer size 4KB (giảm từ 8KB để tiết kiệm memory)
-        
-        ftp.quit()
-        print("✅ Đã đóng kết nối FTP")
-        
-        # Tạo URL công khai
-        if ftp_domain:
-            public_url = f"{ftp_domain}/videos/{new_filename}"
-        else:
-            public_url = f"http://{ftp_host}/videos/{new_filename}"
-        
-        print(f"✅ Đã upload video lên FTP: {public_url}")
-        return public_url
-        
-    except Exception as e:
-        error_msg = str(e)
-        print(f"❌ Lỗi upload FTP: {error_msg}")
-        
-        # Thông báo lỗi chi tiết hơn
-        if "530" in error_msg or "Login authentication failed" in error_msg:
-            print("❌ LỖI: Đăng nhập FTP thất bại!")
-            print("💡 Kiểm tra lại trên Render Environment Variables:")
-            print("   • FTP_HOST có đúng không? (ví dụ: x51ecaliqiny hoặc IP)")
-            print("   • FTP_USER có đúng không? (ví dụ: x51ecaliqiny)")
-            print("   • FTP_PASS có đúng không? (mật khẩu FTP)")
-            print("   • Đảm bảo không có khoảng trắng thừa ở đầu/cuối")
-        elif "timed out" in error_msg.lower() or "timeout" in error_msg.lower():
-            print("❌ LỖI: Kết nối FTP timeout!")
-            print("💡 Kiểm tra lại FTP_HOST có đúng không?")
-        elif "550" in error_msg:
-            print("❌ LỖI: Không tìm thấy thư mục hoặc không có quyền!")
-            print("💡 Kiểm tra lại quyền truy cập FTP")
-        
-        import traceback
-        traceback.print_exc()
-        return None
-
-def download_from_ftp(remote_filename: str, local_path: str) -> bool:
-    """Download file từ FTP hosting về Render (tạm thời để xử lý)"""
-    try:
-        ftp_host = os.getenv("FTP_HOST")
-        ftp_user = os.getenv("FTP_USER")
-        ftp_pass = os.getenv("FTP_PASS")
-        
-        if not all([ftp_host, ftp_user, ftp_pass]):
-            return False
-        
-        print(f"⬇️ Đang download video từ FTP: {remote_filename}")
-        
-        ftp = FTP()
-        ftp.set_pasv(True)
-        ftp.connect(ftp_host, 21, timeout=30)
-        ftp.login(ftp_user, ftp_pass)
-        
-        # ✅ BỎ DẤU / Ở ĐẦU - QUAN TRỌNG!
-        try:
-            ftp.cwd("public_html")  # ✅ KHÔNG có dấu / ở đầu
-            ftp.cwd("videos")
-        except:
-            try:
-                ftp.cwd("videos")  # Thử videos trực tiếp nếu không có public_html
-            except:
-                pass  # Ở lại root directory
-        
-        # ✅ Tối ưu: Download với buffer nhỏ hơn để giảm memory usage
-        with open(local_path, 'wb') as f:
-            ftp.retrbinary(f'RETR {remote_filename}', f.write, 4096)  # Giảm buffer từ 8KB xuống 4KB
-        
-        ftp.quit()
-        print(f"✅ Đã download video từ FTP: {remote_filename}")
-        return True
-        
-    except Exception as e:
-        print(f"⚠️ Lỗi download FTP: {e}")
-        return False
-
-def delete_from_ftp(remote_filename: str) -> bool:
-    """Xóa file từ FTP hosting"""
-    try:
-        ftp_host = os.getenv("FTP_HOST")
-        ftp_user = os.getenv("FTP_USER")
-        ftp_pass = os.getenv("FTP_PASS")
-        
-        if not all([ftp_host, ftp_user, ftp_pass]):
-            return False
-        
-        ftp = FTP()
-        ftp.set_pasv(True)
-        ftp.connect(ftp_host, 21, timeout=30)
-        ftp.login(ftp_user, ftp_pass)
-        
-        # ✅ BỎ DẤU / Ở ĐẦU - QUAN TRỌNG!
-        try:
-            ftp.cwd("public_html")  # ✅ KHÔNG có dấu / ở đầu
-            ftp.cwd("videos")
-        except:
-            try:
-                ftp.cwd("videos")  # Thử videos trực tiếp nếu không có public_html
-            except:
-                pass  # Ở lại root directory
-        
-        ftp.delete(remote_filename)
-        ftp.quit()
-        
-        print(f"🗑️ Đã xóa video từ FTP: {remote_filename}")
-        return True
-    except Exception as e:
-        print(f"⚠️ Lỗi xóa FTP: {e}")
-        return False
 
 def download_video(url: str) -> str:
     print(f"⬇️ Đang tải video: {url}")
@@ -524,25 +258,25 @@ def download_video(url: str) -> str:
             },
             {
                 'outtmpl': temp_name,
-                'format': 'worst[height<=360][ext=mp4]/worst[height<=480][ext=mp4]/worst[ext=mp4]/worst',
+                'format': 'worst[ext=mp4]/worst',
                 'quiet': True,
                 'noplaylist': True,
                 'no_warnings': True,
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'referer': 'https://www.instagram.com/',
                 'socket_timeout': 60,
-                'http_chunk_size': 5242880,  # 5MB chunks
+                'http_chunk_size': 10485760,
             },
             {
                 'outtmpl': temp_name,
-                'format': 'worst[height<=360][ext=mp4]/worst[height<=480][ext=mp4]/worst[height<=720][ext=mp4]/best[height<=360][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720][ext=mp4]/worst',
+                'format': 'best[height<=720]/best',
                 'quiet': True,
                 'noplaylist': True,
                 'no_warnings': True,
                 'user_agent': 'Instagram 219.0.0.12.117 Android',
                 'referer': 'https://www.instagram.com/',
                 'socket_timeout': 60,
-                'http_chunk_size': 5242880,  # 5MB chunks
+                'http_chunk_size': 10485760,
             }
         ]
         
@@ -571,13 +305,10 @@ def download_video(url: str) -> str:
         )
     
     # Cấu hình yt-dlp cho các nền tảng khác
-    # Tối ưu cho Render free tier: download chất lượng THẤP NHẤT để giảm kích thước file
-    # Ưu tiên video nhỏ hơn 5MB để tránh OOM (512MB RAM rất hạn chế)
+    # Tăng timeout cho Render free tier (có thể chậm)
     ydl_opts = {
         'outtmpl': temp_name,
-        # ✅ ƯU TIÊN VIDEO CHẤT LƯỢNG THẤP NHẤT để giảm kích thước file
-        # Thứ tự: 360p → 480p → 720p → best (chỉ dùng best nếu không có lựa chọn khác)
-        'format': 'worst[height<=360][ext=mp4]/worst[height<=480][ext=mp4]/worst[height<=720][ext=mp4]/best[height<=360][ext=mp4]/best[height<=480][ext=mp4]/best[height<=720][ext=mp4]/worst[ext=mp4]/best[ext=mp4]',
+        'format': 'best[ext=mp4]/best',
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
@@ -586,235 +317,61 @@ def download_video(url: str) -> str:
         'referer': url,
         'nocheckcertificate': True,
         'prefer_insecure': False,
-        'retries': 2,  # Giảm retries để tránh timeout
-        'fragment_retries': 2,
+        'retries': 3,
+        'fragment_retries': 3,
         'ignoreerrors': False,
         # Tăng timeout cho Render free tier (mặc định 20s, tăng lên 60s)
         'socket_timeout': 60,
-        'http_chunk_size': 5242880,  # 5MB chunks (giảm từ 10MB)
+        'http_chunk_size': 10485760,  # 10MB chunks
     }
     
     try:
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-        
-        # ✅ Kiểm tra kích thước NGAY SAU KHI DOWNLOAD để tránh xử lý video quá lớn
-        if os.path.exists(temp_name):
-            file_size = os.path.getsize(temp_name)
-            file_size_mb = file_size / (1024 * 1024)
-            print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
-            
-            # ✅ Upload lên FTP hosting ngay sau khi download
-            # Video sẽ được lưu trên FTP, không tốn storage của Render
-            ftp_url = upload_video_to_ftp(temp_name)
-            
-            if ftp_url:
-                # Xóa file khỏi Render ngay sau khi upload lên FTP
-                # Video sẽ được download lại từ FTP khi cần xử lý
-                os.remove(temp_name)
-                gc.collect()
-                print(f"🗑️ Đã xóa video khỏi Render, video đã được lưu trên FTP: {ftp_url}")
-                # Trả về FTP URL thay vì local path
-                return ftp_url
-            else:
-                # Nếu không upload được FTP, giữ file trên Render để xử lý
-                print("⚠️ Không upload được FTP, giữ file trên Render để xử lý")
-        
         return temp_name
     except Exception as e:
-        # Cleanup nếu có lỗi
-        if os.path.exists(temp_name):
-            try:
-                os.remove(temp_name)
-            except:
-                pass
         error_msg = str(e)
         error_msg = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
         raise RuntimeError(f"Lỗi tải video: {error_msg}")
 
-def analyze_video_with_gemini(video_path_or_url: str, mode: str = "detailed") -> str:
+def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
     """
-    Phân tích video với Gemini API
-    video_path_or_url: có thể là local path hoặc FTP URL
+    Phân tích video sử dụng Gemini File API để tránh Out of Memory trên Render.
+    Video được upload trực tiếp lên Google server, không load vào RAM của Render.
     """
-    is_from_ftp = False
-    video_path = None
-    remote_filename = None
+    print("--> Bắt đầu gửi video sang Google Gemini (File API)...")
     
-    # Nếu là FTP URL, download về Render tạm thời để xử lý
-    if video_path_or_url.startswith("http://") or video_path_or_url.startswith("https://"):
-        print(f"📥 Đây là FTP URL, đang download về Render tạm thời...")
-        ftp_url = video_path_or_url
-        remote_filename = os.path.basename(ftp_url)
-        video_path = f"temp_{int(time.time())}_{remote_filename}"
-        
-        if not download_from_ftp(remote_filename, video_path):
-            raise RuntimeError("Không thể download video từ FTP")
-        
-        is_from_ftp = True
-        print(f"✅ Đã download video từ FTP về Render: {video_path}")
-    else:
-        video_path = video_path_or_url
-        is_from_ftp = False
-    
-    # Kiểm tra kích thước file trước khi upload
-    file_size = os.path.getsize(video_path)
-    file_size_mb = file_size / (1024 * 1024)
-    print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
-    
-    # ✅ GIỚI HẠN KÍCH THƯỚC: Render free tier chỉ có 512MB RAM
-    # Video vẫn phải download về Render để upload lên Google (tốn memory)
-    # Giới hạn 50MB để tránh Out of Memory
-    MAX_VIDEO_SIZE_MB = 50
-    if file_size_mb > MAX_VIDEO_SIZE_MB:
-        # Cleanup trước khi raise error
-        if os.path.exists(video_path):
-            try:
-                os.remove(video_path)
-            except:
-                pass
-        raise RuntimeError(
-            f"⚠️ Video quá lớn ({file_size_mb:.2f} MB)!\n\n"
-            f"💡 Giới hạn: {MAX_VIDEO_SIZE_MB} MB\n"
-            "• Render free tier chỉ có 512MB RAM\n"
-            "• Video lớn hơn sẽ gây Out of Memory\n"
-            "• Vui lòng thử với video nhỏ hơn hoặc nâng cấp Render plan"
-        )
-    
-    print("🚀 Đang gửi video lên AI...")
-    uploaded_file = None
     try:
-        # Force garbage collection trước khi upload để giải phóng memory
-        gc.collect()
+        # 1. Cấu hình API Key (đã được cấu hình ở đầu file, nhưng đảm bảo)
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
         
-        # ✅ TỐI ƯU MEMORY: Upload file và xóa NGAY LẬP TỨC
-        # Gemini API sẽ đọc file vào memory của nó, không cần giữ file trên disk
-        print("📤 Đang upload file lên Google Gemini (file sẽ được xóa ngay sau khi bắt đầu upload)...")
-        uploaded_file = genai.upload_file(
-            video_path,
-            display_name=f"video_{int(time.time())}"
-        )
+        # 2. Upload file lên Google Server (Thay vì load vào RAM Render)
+        # Lưu ý: genai.upload_file sẽ upload trực tiếp từ disk lên Google,
+        # không load toàn bộ video vào RAM của Render, giúp tránh Out of Memory
+        video_file = genai.upload_file(video_path)
+        print(f"--> Đang upload file: {video_file.name}")
         
-        # ✅ QUAN TRỌNG: Xóa file video NGAY SAU KHI BẮT ĐẦU upload
-        # Gemini API đã copy file vào memory của nó, không cần giữ trên disk nữa
-        if os.path.exists(video_path):
-            try:
-                file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
-                os.remove(video_path)
-                print(f"🗑️ Đã xóa file video ngay sau khi bắt đầu upload ({file_size_mb:.2f} MB đã được giải phóng)")
-                # Force garbage collection nhiều lần để đảm bảo giải phóng memory
-                gc.collect()
-                gc.collect()  # Gọi 2 lần để đảm bảo
-                gc.collect()  # Gọi thêm lần nữa để chắc chắn
-            except Exception as e:
-                print(f"⚠️ Không thể xóa file ngay: {e}")
+        # 3. Đợi Google xử lý file (Bắt buộc với video)
+        # Google cần thời gian để xử lý video trước khi có thể phân tích
+        while video_file.state.name == "PROCESSING":
+            print("--> Google đang xử lý video...")
+            time.sleep(2)
+            video_file = genai.get_file(video_file.name)
         
-        # ✅ TỐI ƯU: Đợi Google xử lý file (Google đã copy file vào memory của nó)
-        # Render không cần giữ file trên disk nữa, chỉ cần đợi Google xử lý xong
-        max_wait = 120  # 2 phút
-        waited = 0
-        while waited < max_wait:
-            file = genai.get_file(uploaded_file.name)
-            # Kiểm tra state: PROCESSING -> ACTIVE -> sẵn sàng dùng
-            if file.state.name == "ACTIVE":
-                print("✅ File đã được upload và xử lý thành công bởi Google")
-                # Đảm bảo file đã được xóa (nếu chưa xóa ở trên)
-                if os.path.exists(video_path):
-                    try:
-                        os.remove(video_path)
-                        gc.collect()
-                        gc.collect()
-                    except:
-                        pass
-                # Force garbage collection sau khi upload thành công
-                gc.collect()
-                break
-            elif file.state.name == "FAILED":
-                error_msg = "Google từ chối file."
-                # Thử lấy thông tin lỗi chi tiết nếu có
-                try:
-                    if hasattr(file, 'error') and file.error:
-                        error_msg += f"\nChi tiết: {file.error}"
-                except:
-                    pass
-                raise RuntimeError(error_msg)
-            # File đang ở trạng thái PROCESSING, tiếp tục đợi
-            time.sleep(3)  # Đợi 3 giây mỗi lần (theo hướng dẫn)
-            waited += 3
-            print(f"⏳ Đang chờ Google xử lý file... ({waited}s/{max_wait}s)")
+        # Kiểm tra nếu Google không đọc được video
+        if video_file.state.name == "FAILED":
+            raise ValueError("Google không đọc được video này.")
         
-        if waited >= max_wait:
-            raise RuntimeError("Timeout: Google xử lý file quá lâu. Vui lòng thử lại với video ngắn hơn.")
-            
-    except Exception as e:
-        # Đảm bảo cleanup nếu có lỗi
-        if os.path.exists(video_path):
-            try:
-                os.remove(video_path)
-            except:
-                pass
-        error_msg = str(e)
-        if "rejected" in error_msg.lower() or "failed" in error_msg.lower():
-            raise RuntimeError(
-                "⚠️ Google từ chối file video.\n\n"
-                "💡 Nguyên nhân có thể:\n"
-                "• File quá lớn (>10MB)\n"
-                "• Format không được hỗ trợ\n"
-                "• Video quá dài\n"
-                "• Nội dung vi phạm chính sách\n\n"
-                f"Chi tiết: {error_msg[:200]}"
-            )
-        raise
-
-    print(f"✍️ Đang viết kịch bản (mode={mode})...")
-    print(f"🤖 Đang dùng model: {CHOSEN_MODEL}")
-    
-    # Thử tạo model, nếu lỗi 404 thì thử model khác
-    try:
-        model = genai.GenerativeModel(CHOSEN_MODEL)
-    except Exception as e:
-        error_msg = str(e)
-        if "404" in error_msg or "not found" in error_msg.lower() or "not supported" in error_msg.lower():
-            print(f"❌ Model {CHOSEN_MODEL} không tồn tại hoặc không được hỗ trợ!")
-            print("🔄 Đang thử tìm model khác...")
-            
-            # Thử tìm model khác từ danh sách
-            try:
-                available_models = []
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        m_name = m.name
-                        if ("gemini" in m_name.lower() and "gemma" not in m_name.lower() and
-                            "2.5" not in m_name and "2.0" not in m_name and 
-                            "exp" not in m_name.lower() and "latest" not in m_name.lower() and
-                            "preview" not in m_name.lower() and "3-pro" not in m_name.lower()):
-                            available_models.append(m_name)
-                
-                if available_models:
-                    fallback_model = available_models[0]
-                    print(f"✅ Tìm thấy model thay thế: {fallback_model}")
-                    model = genai.GenerativeModel(fallback_model)
-                    print(f"✅ Đã chuyển sang model: {fallback_model} (chỉ cho request này)")
-                else:
-                    raise RuntimeError(
-                        "⚠️ Không tìm thấy model Gemini nào khả dụng!\n\n"
-                        "💡 Giải pháp:\n"
-                        "• Kiểm tra API key có đúng không\n"
-                        "• Kiểm tra quota API key\n"
-                        "• Thử lại sau vài phút\n\n"
-                        f"Chi tiết: {error_msg[:200]}"
-                    )
-            except Exception as e2:
-                raise RuntimeError(
-                    f"⚠️ Lỗi model: {CHOSEN_MODEL} không tồn tại và không thể tìm model thay thế.\n\n"
-                    f"💡 Chi tiết: {error_msg[:200]}\n\n"
-                    "Vui lòng kiểm tra API key và thử lại."
-                )
-        else:
-            raise
-    
-    if mode == "transcript":
-        prompt = """Hãy nghe video này, trích xuất toàn bộ lời thoại và DỊCH SANG TIẾNG VIỆT chuẩn xác.
+        print("--> File đã được Google xử lý xong, bắt đầu phân tích...")
+        
+        # 4. Gọi AI phân tích (Dùng gemini-1.5-flash thay vì gemini-1.5-pro)
+        # Lưu ý: gemini-1.5-flash có quota cao hơn và phù hợp hơn cho free tier
+        print("--> Đang yêu cầu AI viết kịch bản...")
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        
+        # Tạo prompt tùy theo mode
+        if mode == "transcript":
+            prompt = """Hãy nghe video này, trích xuất toàn bộ lời thoại và DỊCH SANG TIẾNG VIỆT chuẩn xác.
 
 YÊU CẦU:
 1. Ở DÒNG ĐẦU TIÊN, viết một TIÊU ĐỀ ngắn gọn, hấp dẫn tóm tắt toàn bộ nội dung video (định dạng: **TIÊU ĐỀ**)
@@ -828,8 +385,8 @@ Ví dụ format:
 [00:05] Lời thoại đầu tiên đã dịch sang tiếng Việt...
 [00:12] Lời thoại tiếp theo đã dịch sang tiếng Việt...
 [01:30] Lời thoại sau đó đã dịch sang tiếng Việt..."""
-    else:
-        prompt = """Xem video này và viết kịch bản tiếng Việt chi tiết (Mô tả bối cảnh + Lời thoại).
+        else:
+            prompt = """Xem video này và viết kịch bản tiếng Việt chi tiết (Mô tả bối cảnh + Lời thoại).
 
 YÊU CẦU:
 1. Ở DÒNG ĐẦU TIÊN, viết một TIÊU ĐỀ ngắn gọn, hấp dẫn tóm tắt toàn bộ nội dung video (định dạng: **TIÊU ĐỀ**)
@@ -842,38 +399,31 @@ Ví dụ format:
 
 [00:05] [Bối cảnh] Mô tả cảnh bằng tiếng Việt...
 [00:08] [Lời thoại] Nội dung lời nói đã dịch sang tiếng Việt..."""
-    
-    safety = [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-              {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-              {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-              {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
-    
-    # Retry logic cho rate limit (429)
-    max_retries = 3
-    retry_delay = 5  # giây
-    
-    try:
+        
+        safety = [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                  {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                  {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                  {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
+        
+        # Retry logic cho rate limit (429)
+        max_retries = 3
+        retry_delay = 5  # giây
+        
         for attempt in range(max_retries):
             try:
-                response = model.generate_content([uploaded_file, prompt], safety_settings=safety)
+                response = model.generate_content([video_file, prompt], safety_settings=safety)
                 result = response.text if response.text else "Không có nội dung trả về."
                 
-                # ✅ QUAN TRỌNG: Xóa file từ Google NGAY SAU KHI CÓ KỊCH BẢN
-                # Không đợi đến finally, để giải phóng memory ngay lập tức
-                if uploaded_file:
-                    try:
-                        genai.delete_file(uploaded_file.name)
-                        print("🗑️ Đã xóa file từ Google ngay sau khi có kịch bản")
-                        uploaded_file = None  # Đánh dấu đã xóa
-                    except Exception as e:
-                        print(f"⚠️ Không thể xóa file từ Google: {e}")
+                # 5. Dọn dẹp (Xóa file trên Google sau khi xong để sạch sẽ)
+                try:
+                    genai.delete_file(video_file.name)
+                    print("--> Đã xóa file trên Google server")
+                except Exception as cleanup_error:
+                    print(f"⚠️ Không thể xóa file trên Google: {cleanup_error}")
                 
-                # Force garbage collection sau khi generate content và xóa file
-                gc.collect()
-                gc.collect()
-                
-                print("✅ Đã tạo kịch bản thành công (video đã được xóa, chỉ lưu kịch bản)")
+                print("--> Xử lý thành công!")
                 return result
+                
             except Exception as e:
                 error_msg = str(e)
                 
@@ -891,6 +441,11 @@ Ví dụ format:
                         retry_delay *= 2  # Exponential backoff
                         continue
                     else:
+                        # Dọn dẹp trước khi raise error
+                        try:
+                            genai.delete_file(video_file.name)
+                        except:
+                            pass
                         raise RuntimeError(
                             "⚠️ Đã vượt quá quota của Google Gemini API (free tier).\n\n"
                             "💡 Giải pháp:\n"
@@ -899,38 +454,25 @@ Ví dụ format:
                             "• Free tier có giới hạn số requests mỗi phút\n\n"
                             f"Chi tiết: {error_msg[:200]}"
                         )
-                raise
-    finally:
-        # Cleanup: Xóa uploaded file từ Google (nếu chưa xóa ở trên)
-        if uploaded_file:
-            try:
-                genai.delete_file(uploaded_file.name)
-                print("🗑️ Đã xóa file từ Google (cleanup)")
-            except:
-                pass
-        
-        # Nếu video được download từ FTP, xóa file local và xóa từ FTP
-        try:
-            if 'is_from_ftp' in locals() and is_from_ftp:
-                if 'video_path' in locals() and video_path and os.path.exists(video_path):
+                else:
+                    # Dọn dẹp trước khi raise error
                     try:
-                        os.remove(video_path)
-                        print("🗑️ Đã xóa file tạm thời từ Render")
+                        genai.delete_file(video_file.name)
                     except:
                         pass
-                
-                # Xóa video từ FTP sau khi xử lý xong
-                if 'remote_filename' in locals() and remote_filename:
-                    delete_from_ftp(remote_filename)
+                    # Lỗi khác, không retry
+                    raise
+        
+        # Dọn dẹp nếu có lỗi
+        try:
+            genai.delete_file(video_file.name)
         except:
             pass
+        return "Không có nội dung trả về."
         
-        # Force garbage collection nhiều lần sau khi cleanup để giải phóng memory tối đa
-        gc.collect()
-        gc.collect()
-        gc.collect()
-    
-    return "Không có nội dung trả về."
+    except Exception as e:
+        print(f"❌ Lỗi AI: {e}")
+        return "Lỗi AI tạo kịch bản."
 
 # --- AUTH HELPERS ---
 def get_current_user():
@@ -967,41 +509,18 @@ def analyze():
         mode = data.get("mode", "detailed")
         if not url: return jsonify({"error": "Thiếu URL"}), 400
 
-        print(f"📥 Bắt đầu xử lý video từ URL: {url}")
-        print("💡 LƯU Ý: KHÔNG lưu bất cứ thứ gì vào database (chỉ lưu thông tin đăng nhập)")
-        print("   ❌ KHÔNG lưu: Video file, kịch bản, link video - TIẾT KIỆM MEMORY TỐI ĐA")
-        
         video_path = download_video(url)
         script_text = analyze_video_with_gemini(video_path, mode=mode)
 
-        # ✅ KHÔNG LƯU GÌ VÀO DATABASE - CHỈ TRẢ VỀ KỊCH BẢN CHO USER
-        # Database CHỈ lưu thông tin đăng nhập (User model)
-        # KHÔNG lưu: Video file, kịch bản, link video, lịch sử
-        # → TIẾT KIỆM MEMORY/DATABASE TỐI ĐA
-        print("✅ Đã tạo kịch bản thành công - KHÔNG lưu vào database (tiết kiệm memory)")
+        script_row = Script(user_id=user.id, video_url=url, script_content=script_text, mode=mode)
+        db.session.add(script_row)
+        db.session.commit()
+        log_script_to_csv(script_row, user.username)
 
-        # ✅ Đảm bảo video đã được xóa (đã xóa trong analyze_video_with_gemini)
-        # Nếu video_path_or_url là local path (không phải FTP URL), xóa nó
-        if not (video_path_or_url.startswith("http://") or video_path_or_url.startswith("https://")):
-            if os.path.exists(video_path_or_url):
-                try:
-                    os.remove(video_path_or_url)
-                    print("🗑️ Đã xóa file video cuối cùng (đảm bảo cleanup)")
-                    gc.collect()
-                except Exception as e:
-                    print(f"⚠️ Không thể xóa file video: {e}")
-        
-        print("✅ Hoàn thành: Kịch bản đã được lưu, video đã được xóa")
+        if os.path.exists(video_path): os.remove(video_path)
         return jsonify({"script": script_text})
     except Exception as e:
         print(f"❌ LỖI: {e}")
-        # Đảm bảo cleanup nếu có lỗi
-        try:
-            if 'video_path' in locals() and os.path.exists(video_path):
-                os.remove(video_path)
-                gc.collect()
-        except:
-            pass
         return jsonify({"error": str(e)}), 500
 
 @app.route("/register", methods=["POST"])
@@ -1060,13 +579,19 @@ def api_current_user():
 
 @app.route("/api/get_history", methods=["GET"])
 def api_get_history():
-    """Lấy lịch sử - KHÔNG lưu lịch sử để tiết kiệm memory"""
     user = get_current_user()
     if not user: return jsonify({"items": []}), 401
     
-    # ✅ KHÔNG TRẢ VỀ LỊCH SỬ - TIẾT KIỆM MEMORY
-    # Database chỉ lưu thông tin đăng nhập, không lưu lịch sử
-    return jsonify({"items": []})
+    scripts = Script.query.filter_by(user_id=user.id).order_by(Script.created_at.desc()).all()
+    
+    items = [{
+        "id": s.id,
+        "video_url": s.video_url,
+        "script_content": s.script_content,
+        "mode": s.mode,
+        "created_at": s.created_at.isoformat()
+    } for s in scripts]
+    return jsonify({"items": items})
 
 @app.route("/api/admin/users", methods=["GET"])
 def api_admin_users():
@@ -1117,7 +642,7 @@ def api_admin_block_user(user_id):
 
 @app.route("/api/admin/users/<int:user_id>/scripts", methods=["GET"])
 def api_admin_get_user_scripts(user_id):
-    """Lấy danh sách video đã xử lý của user (chỉ admin) - KHÔNG lưu lịch sử để tiết kiệm memory"""
+    """Lấy danh sách scripts của user (chỉ admin)"""
     admin = get_current_user()
     if not admin or not admin.is_admin:
         return jsonify({"error": "Unauthorized"}), 403
@@ -1126,12 +651,20 @@ def api_admin_get_user_scripts(user_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
     
-    # ✅ KHÔNG TRẢ VỀ LỊCH SỬ - TIẾT KIỆM MEMORY
-    # Database chỉ lưu thông tin đăng nhập, không lưu lịch sử
+    scripts = Script.query.filter_by(user_id=user_id).order_by(Script.created_at.desc()).all()
+    
+    items = [{
+        "id": s.id,
+        "video_url": s.video_url,
+        "script_content": s.script_content,
+        "mode": s.mode,
+        "created_at": s.created_at.isoformat() if s.created_at else None
+    } for s in scripts]
+    
     return jsonify({
         "username": user.username,
-        "scripts": [],
-        "total": 0
+        "scripts": items,
+        "total": len(items)
     })
 
 @app.route("/api/admin/stats", methods=["GET"])
@@ -1174,29 +707,7 @@ def api_translate():
         print(f"🌐 Đang dịch sang {language_name} ({target_language})...")
         
         # Sử dụng Gemini để dịch
-        print(f"🤖 Đang dùng model: {CHOSEN_MODEL}")
-        try:
-            model = genai.GenerativeModel(CHOSEN_MODEL)
-        except Exception as e:
-            error_msg = str(e)
-            if "404" in error_msg or "not found" in error_msg.lower() or "not supported" in error_msg.lower():
-                print(f"❌ Model {CHOSEN_MODEL} không tồn tại, đang tìm model thay thế...")
-                # Thử tìm model khác
-                available_models = []
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        m_name = m.name
-                        if ("gemini" in m_name.lower() and "gemma" not in m_name.lower() and
-                            "2.5" not in m_name and "exp" not in m_name.lower() and
-                            "latest" not in m_name.lower() and "preview" not in m_name.lower()):
-                            available_models.append(m_name)
-                if available_models:
-                    model = genai.GenerativeModel(available_models[0])
-                    print(f"✅ Đã chuyển sang model: {available_models[0]}")
-                else:
-                    raise RuntimeError(f"Không tìm thấy model khả dụng. Chi tiết: {error_msg[:200]}")
-            else:
-                raise
+        model = genai.GenerativeModel(CHOSEN_MODEL)
         prompt = f"Hãy dịch toàn bộ nội dung sau sang {language_name} ({target_language}). Giữ nguyên định dạng, cấu trúc và dấu thời gian (nếu có). Chỉ dịch nội dung, không thêm giải thích:\n\n{text}"
         
         safety = [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
