@@ -159,11 +159,19 @@ def get_best_model_name():
             for m in available_models:
                 if "gemini" in m.lower() and "gemma" not in m.lower():
                     print(f"   - {m}")
-            # Fallback: Dùng model gemini đầu tiên có sẵn (nếu có)
+            # Fallback: Dùng model gemini đầu tiên có sẵn (NHƯNG VẪN LOẠI BỎ 2.5, 2.0, exp, latest, preview, 3-pro)
             for m in available_models:
-                if "gemini" in m.lower() and "gemma" not in m.lower():
-                    print(f"⚠️ Fallback: Dùng model đầu tiên tìm thấy: {m}")
-                    return m
+                m_lower = m.lower()
+                if "gemini" in m_lower and "gemma" not in m_lower:
+                    # ✅ QUAN TRỌNG: Fallback cũng phải loại bỏ các model không mong muốn
+                    should_exclude = False
+                    for keyword in excluded_keywords:
+                        if keyword in m_lower or keyword in m:
+                            should_exclude = True
+                            break
+                    if not should_exclude:
+                        print(f"⚠️ Fallback: Dùng model đầu tiên tìm thấy (đã lọc): {m}")
+                        return m
         
         # Ưu tiên 1: gemini-1.5-flash (tốt nhất cho free tier, hỗ trợ video, nhẹ nhất)
         # Thử các biến thể: flash, flash-001, flash-002, flash-latest
@@ -212,8 +220,8 @@ def get_best_model_name():
         print(f"   Thử: {fallback}")
         # Không test ở đây, để code tự báo lỗi nếu model không tồn tại
     
-    # Fallback cuối cùng: Dùng model đầu tiên trong danh sách (nếu có)
-    print("⚠️ Fallback: Sẽ dùng model đầu tiên có sẵn (có thể gây lỗi nếu không phù hợp)")
+    # Fallback cuối cùng: Dùng model 1.5-flash (KHÔNG BAO GIỜ dùng 2.5)
+    print("⚠️ Fallback: Sẽ dùng model gemini-1.5-flash (KHÔNG dùng 2.5)")
     return "models/gemini-1.5-flash-001"  # Thử biến thể có số version
 
 CHOSEN_MODEL = get_best_model_name()
