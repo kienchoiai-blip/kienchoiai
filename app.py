@@ -356,7 +356,7 @@ def upload_video_to_ftp(local_file_path: str) -> str:
         # Upload file
         print(f"📤 Đang upload file: {local_file_path} -> {new_filename}")
         with open(local_file_path, 'rb') as f:
-            ftp.storbinary(f'STOR {new_filename}', f, 8192)  # Buffer size 8KB
+            ftp.storbinary(f'STOR {new_filename}', f, 4096)  # Buffer size 4KB (giảm từ 8KB để tiết kiệm memory)
         
         ftp.quit()
         print("✅ Đã đóng kết nối FTP")
@@ -420,8 +420,9 @@ def download_from_ftp(remote_filename: str, local_path: str) -> bool:
             except:
                 pass  # Ở lại root directory
         
+        # ✅ Tối ưu: Download với buffer nhỏ hơn để giảm memory usage
         with open(local_path, 'wb') as f:
-            ftp.retrbinary(f'RETR {remote_filename}', f.write, 8192)
+            ftp.retrbinary(f'RETR {remote_filename}', f.write, 4096)  # Giảm buffer từ 8KB xuống 4KB
         
         ftp.quit()
         print(f"✅ Đã download video từ FTP: {remote_filename}")
@@ -653,8 +654,24 @@ def analyze_video_with_gemini(video_path_or_url: str, mode: str = "detailed") ->
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # ✅ BỎ GIỚI HẠN - Video đã được lưu trên FTP, không tốn storage Render
-    # Không cần giới hạn kích thước nữa vì video không còn lưu trên Render lâu dài
+    # ✅ GIỚI HẠN KÍCH THƯỚC: Render free tier chỉ có 512MB RAM
+    # Video vẫn phải download về Render để upload lên Google (tốn memory)
+    # Giới hạn 50MB để tránh Out of Memory
+    MAX_VIDEO_SIZE_MB = 50
+    if file_size_mb > MAX_VIDEO_SIZE_MB:
+        # Cleanup trước khi raise error
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except:
+                pass
+        raise RuntimeError(
+            f"⚠️ Video quá lớn ({file_size_mb:.2f} MB)!\n\n"
+            f"💡 Giới hạn: {MAX_VIDEO_SIZE_MB} MB\n"
+            "• Render free tier chỉ có 512MB RAM\n"
+            "• Video lớn hơn sẽ gây Out of Memory\n"
+            "• Vui lòng thử với video nhỏ hơn hoặc nâng cấp Render plan"
+        )
     
     print("🚀 Đang gửi video lên AI...")
     uploaded_file = None
@@ -662,20 +679,25 @@ def analyze_video_with_gemini(video_path_or_url: str, mode: str = "detailed") ->
         # Force garbage collection trước khi upload để giải phóng memory
         gc.collect()
         
+        # ✅ TỐI ƯU MEMORY: Upload file và xóa NGAY LẬP TỨC
+        # Gemini API sẽ đọc file vào memory của nó, không cần giữ file trên disk
+        print("📤 Đang upload file lên Google Gemini (file sẽ được xóa ngay sau khi bắt đầu upload)...")
         uploaded_file = genai.upload_file(
             video_path,
             display_name=f"video_{int(time.time())}"
         )
         
         # ✅ QUAN TRỌNG: Xóa file video NGAY SAU KHI BẮT ĐẦU upload
-        # Không cần đợi upload xong, vì file đã được copy vào memory của Gemini API
+        # Gemini API đã copy file vào memory của nó, không cần giữ trên disk nữa
         if os.path.exists(video_path):
             try:
+                file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
                 os.remove(video_path)
-                print("🗑️ Đã xóa file video ngay sau khi bắt đầu upload để giải phóng bộ nhớ")
+                print(f"🗑️ Đã xóa file video ngay sau khi bắt đầu upload ({file_size_mb:.2f} MB đã được giải phóng)")
                 # Force garbage collection nhiều lần để đảm bảo giải phóng memory
                 gc.collect()
                 gc.collect()  # Gọi 2 lần để đảm bảo
+                gc.collect()  # Gọi thêm lần nữa để chắc chắn
             except Exception as e:
                 print(f"⚠️ Không thể xóa file ngay: {e}")
         
