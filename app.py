@@ -329,36 +329,35 @@ def upload_video_to_ftp(local_file_path: str) -> str:
         ftp.connect(ftp_host, 21, timeout=30)  # Kết nối với timeout
         ftp.login(ftp_user, ftp_pass)
         
+        # Chuyển đến thư mục public_html
         try:
-            # Chuyển đến thư mục public_html
+            ftp.cwd("public_html")
+            print("✅ Đã vào thư mục public_html")
+        except Exception as e:
+            print(f"⚠️ Không tìm thấy public_html: {e}, thử root directory")
+            # Thử các thư mục khác
             try:
-                ftp.cwd("public_html")
-                print("✅ Đã vào thư mục public_html")
-            except Exception as e:
-                print(f"⚠️ Không tìm thấy public_html: {e}, thử root directory")
-                # Thử các thư mục khác
-                try:
-                    ftp.cwd("/")
-                except:
-                    pass
-            
-            # Tạo thư mục videos nếu chưa có
-            try:
-                ftp.mkd("videos")
-                print("✅ Đã tạo thư mục videos")
+                ftp.cwd("/")
             except:
-                pass  # Thư mục đã tồn tại
-            
-            ftp.cwd("videos")
-            print("✅ Đã vào thư mục videos")
-            
-            # Upload file
-            print(f"📤 Đang upload file: {local_file_path} -> {new_filename}")
-            with open(local_file_path, 'rb') as f:
-                ftp.storbinary(f'STOR {new_filename}', f, 8192)  # Buffer size 8KB
-            
-            ftp.quit()
-            print("✅ Đã đóng kết nối FTP")
+                pass
+        
+        # Tạo thư mục videos nếu chưa có
+        try:
+            ftp.mkd("videos")
+            print("✅ Đã tạo thư mục videos")
+        except:
+            pass  # Thư mục đã tồn tại
+        
+        ftp.cwd("videos")
+        print("✅ Đã vào thư mục videos")
+        
+        # Upload file
+        print(f"📤 Đang upload file: {local_file_path} -> {new_filename}")
+        with open(local_file_path, 'rb') as f:
+            ftp.storbinary(f'STOR {new_filename}', f, 8192)  # Buffer size 8KB
+        
+        ftp.quit()
+        print("✅ Đã đóng kết nối FTP")
         
         # Tạo URL công khai
         if ftp_domain:
@@ -404,18 +403,23 @@ def download_from_ftp(remote_filename: str, local_path: str) -> bool:
         
         print(f"⬇️ Đang download video từ FTP: {remote_filename}")
         
-        with FTP(ftp_host) as ftp:
-            ftp.login(ftp_user, ftp_pass)
-            ftp.set_pasv(True)
-            
-            try:
-                ftp.cwd("public_html/videos")
-            except:
-                ftp.cwd("videos")
-            
-            with open(local_path, 'wb') as f:
-                ftp.retrbinary(f'RETR {remote_filename}', f.write)
+        ftp = FTP()
+        ftp.set_pasv(True)
+        ftp.connect(ftp_host, 21, timeout=30)
+        ftp.login(ftp_user, ftp_pass)
         
+        try:
+            ftp.cwd("public_html/videos")
+        except:
+            try:
+                ftp.cwd("videos")
+            except:
+                ftp.cwd("/")
+        
+        with open(local_path, 'wb') as f:
+            ftp.retrbinary(f'RETR {remote_filename}', f.write, 8192)
+        
+        ftp.quit()
         print(f"✅ Đã download video từ FTP: {remote_filename}")
         return True
         
