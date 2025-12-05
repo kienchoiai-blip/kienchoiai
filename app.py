@@ -370,11 +370,26 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
         
         print("--> File đã được Google xử lý xong, bắt đầu phân tích...")
         
-        # 4. Gọi AI phân tích (Dùng gemini-1.5-flash thay vì gemini-1.5-pro)
-        # Lưu ý: gemini-1.5-flash có quota cao hơn và phù hợp hơn cho free tier
-        # QUAN TRỌNG: Dùng tên model ngắn gọn, không có đuôi -001 để tránh lỗi 404
+        # 4. Gọi AI phân tích
+        # QUAN TRỌNG: Dùng CHOSEN_MODEL (đã được tự động chọn từ danh sách model khả dụng)
+        # Nếu CHOSEN_MODEL lỗi, sẽ thử các model khác
         print("--> Đang yêu cầu AI viết kịch bản...")
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        
+        # Danh sách model để thử (theo thứ tự ưu tiên)
+        # Lưu ý: Bỏ prefix "models/" vì GenerativeModel tự động thêm
+        models_to_try = []
+        
+        # Thêm CHOSEN_MODEL vào đầu danh sách (đã được chọn tự động)
+        if CHOSEN_MODEL:
+            # Loại bỏ prefix "models/" nếu có
+            chosen = CHOSEN_MODEL.replace("models/", "")
+            if chosen not in models_to_try:
+                models_to_try.append(chosen)
+        
+        # Thêm các model fallback
+        for fallback_model in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
+            if fallback_model not in models_to_try:
+                models_to_try.append(fallback_model)
         
         # Tạo prompt tùy theo mode
         if mode == "transcript":
@@ -412,12 +427,15 @@ Ví dụ format:
                   {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
                   {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
         
-        # Retry logic cho rate limit (429)
-        max_retries = 3
-        retry_delay = 5  # giây
+        # Retry logic: thử các model khác nhau nếu model hiện tại lỗi
+        last_error = None
         
-        for attempt in range(max_retries):
+        for model_idx, model_name in enumerate(models_to_try):
             try:
+                print(f"--> Đang thử model: {model_name}...")
+                model = genai.GenerativeModel(model_name=model_name)
+                
+                # Thử gọi API với model này
                 response = model.generate_content([video_file, prompt], safety_settings=safety)
                 result = response.text if response.text else "Không có nội dung trả về."
                 
@@ -428,24 +446,44 @@ Ví dụ format:
                 except Exception as cleanup_error:
                     print(f"⚠️ Không thể xóa file trên Google: {cleanup_error}")
                 
-                print("--> Xử lý thành công!")
+                print(f"--> Xử lý thành công với model {model_name}!")
                 return result
                 
             except Exception as e:
                 error_msg = str(e)
+                last_error = error_msg
+                
+                # Kiểm tra nếu là lỗi 404 (model not found)
+                if "404" in error_msg or "not found" in error_msg.lower():
+                    print(f"⚠️ Model {model_name} không khả dụng: {error_msg[:150]}")
+                    # Thử model tiếp theo
+                    if model_idx < len(models_to_try) - 1:
+                        print(f"--> Chuyển sang thử model tiếp theo...")
+                        continue
+                    else:
+                        # Đã thử hết tất cả model
+                        try:
+                            genai.delete_file(video_file.name)
+                        except:
+                            pass
+                        raise RuntimeError(
+                            f"⚠️ Không tìm thấy model nào khả dụng!\n\n"
+                            f"💡 Đã thử các model: {', '.join(models_to_try)}\n"
+                            f"Lỗi cuối: {error_msg[:200]}\n\n"
+                            "Vui lòng kiểm tra API key và quota của bạn."
+                        )
                 
                 # Kiểm tra rate limit (429)
-                if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
-                    if attempt < max_retries - 1:
-                        # Tìm thời gian retry từ error message
-                        import re
-                        retry_match = re.search(r'retry in (\d+\.?\d*)s', error_msg, re.IGNORECASE)
-                        if retry_match:
-                            retry_delay = int(float(retry_match.group(1))) + 2
-                        
-                        print(f"⏳ Rate limit! Đợi {retry_delay}s trước khi thử lại (lần {attempt + 1}/{max_retries})...")
-                        time.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
+                elif "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                    print(f"⏳ Rate limit! Đợi 10s trước khi thử lại...")
+                    time.sleep(10)
+                    # Thử lại với model hiện tại
+                    continue
+                
+                else:
+                    # Lỗi khác, thử model tiếp theo hoặc raise
+                    print(f"⚠️ Lỗi với model {model_name}: {error_msg[:150]}")
+                    if model_idx < len(models_to_try) - 1:
                         continue
                     else:
                         # Dọn dẹp trước khi raise error
@@ -453,22 +491,17 @@ Ví dụ format:
                             genai.delete_file(video_file.name)
                         except:
                             pass
-                        raise RuntimeError(
-                            "⚠️ Đã vượt quá quota của Google Gemini API (free tier).\n\n"
-                            "💡 Giải pháp:\n"
-                            "• Đợi vài phút rồi thử lại\n"
-                            "• Hoặc nâng cấp API key lên paid plan\n"
-                            "• Free tier có giới hạn số requests mỗi phút\n\n"
-                            f"Chi tiết: {error_msg[:200]}"
-                        )
-                else:
-                    # Dọn dẹp trước khi raise error
-                    try:
-                        genai.delete_file(video_file.name)
-                    except:
-                        pass
-                    # Lỗi khác, không retry
-                    raise
+                        raise RuntimeError(f"Lỗi AI: {error_msg[:200]}")
+        
+        # Nếu đến đây nghĩa là đã thử hết tất cả model
+        try:
+            genai.delete_file(video_file.name)
+        except:
+            pass
+        raise RuntimeError(
+            f"⚠️ Không thể xử lý với bất kỳ model nào!\n\n"
+            f"Lỗi: {last_error[:200] if last_error else 'Unknown'}"
+        )
         
         # Dọn dẹp nếu có lỗi
         try:
