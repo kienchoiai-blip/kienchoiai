@@ -112,14 +112,20 @@ def get_best_model_name():
         # Ưu tiên 1: gemini-1.5-flash
         for m in filtered_models:
             if "gemini-1.5-flash" in m: 
-                print(f"✅ Chọn model: {m} (tốt nhất cho free tier)")
-                return m
+                # Normalize tên model: loại bỏ đuôi -001, -002, etc.
+                # Chỉ dùng tên ngắn gọn: gemini-1.5-flash
+                model_name = "models/gemini-1.5-flash"
+                print(f"✅ Chọn model: {model_name} (tốt nhất cho free tier)")
+                return model_name
         
         # Ưu tiên 2: gemini-1.5-pro
         for m in filtered_models:
             if "gemini-1.5-pro" in m: 
-                print(f"✅ Chọn model: {m}")
-                return m
+                # Normalize tên model: loại bỏ đuôi -001, -002, etc.
+                # Chỉ dùng tên ngắn gọn: gemini-1.5-pro
+                model_name = "models/gemini-1.5-pro"
+                print(f"✅ Chọn model: {model_name}")
+                return model_name
         
         # Ưu tiên 3: gemini-pro (không có latest)
         for m in filtered_models:
@@ -366,6 +372,7 @@ def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
         
         # 4. Gọi AI phân tích (Dùng gemini-1.5-flash thay vì gemini-1.5-pro)
         # Lưu ý: gemini-1.5-flash có quota cao hơn và phù hợp hơn cho free tier
+        # QUAN TRỌNG: Dùng tên model ngắn gọn, không có đuôi -001 để tránh lỗi 404
         print("--> Đang yêu cầu AI viết kịch bản...")
         model = genai.GenerativeModel(model_name="gemini-1.5-flash")
         
