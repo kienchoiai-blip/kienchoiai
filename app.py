@@ -316,10 +316,10 @@ def upload_video_to_ftp(local_file_path: str) -> str:
             return None
         
         # Tạo tên file mới với timestamp để tránh trùng
+        # ✅ QUAN TRỌNG: TenTen Host kỵ file có dấu tiếng Việt hoặc khoảng trắng
+        # Đổi tên file thành dạng số để chắc chắn không bị lỗi ký tự
         timestamp = int(time.time())
-        original_filename = os.path.basename(local_file_path)
-        name, ext = os.path.splitext(original_filename)
-        new_filename = f"{name}_{timestamp}{ext}"
+        new_filename = f"video_{timestamp}.mp4"  # ✅ Tên file đơn giản, không có ký tự đặc biệt
         
         print(f"📤 Đang upload video lên FTP: {new_filename}")
         print(f"🔐 Kết nối FTP: host={ftp_host}, user={ftp_user}")
@@ -329,27 +329,29 @@ def upload_video_to_ftp(local_file_path: str) -> str:
         ftp.connect(ftp_host, 21, timeout=30)  # Kết nối với timeout
         ftp.login(ftp_user, ftp_pass)
         
-        # Chuyển đến thư mục public_html
+        # 1. Vào thư mục public_html (BỎ DẤU / Ở ĐẦU - QUAN TRỌNG!)
+        # Không dùng "/public_html" vì sẽ tìm ở Server Root (không có quyền)
+        # Dùng "public_html" để tìm relative từ user root
         try:
-            ftp.cwd("public_html")
+            ftp.cwd("public_html")  # ✅ KHÔNG có dấu / ở đầu
             print("✅ Đã vào thư mục public_html")
         except Exception as e:
             print(f"⚠️ Không tìm thấy public_html: {e}, thử root directory")
-            # Thử các thư mục khác
-            try:
-                ftp.cwd("/")
-            except:
-                pass
+            # Nếu không có public_html, ở lại root directory
         
-        # Tạo thư mục videos nếu chưa có
+        # 2. Vào tiếp thư mục videos (tạo nếu chưa có)
         try:
-            ftp.mkd("videos")
-            print("✅ Đã tạo thư mục videos")
+            ftp.cwd("videos")  # ✅ KHÔNG có dấu / ở đầu
+            print("✅ Đã vào thư mục videos")
         except:
-            pass  # Thư mục đã tồn tại
-        
-        ftp.cwd("videos")
-        print("✅ Đã vào thư mục videos")
+            # Nếu chưa có thư mục videos, tạo mới
+            try:
+                ftp.mkd("videos")
+                print("✅ Đã tạo thư mục videos")
+                ftp.cwd("videos")
+            except Exception as e2:
+                print(f"⚠️ Không thể tạo thư mục videos: {e2}")
+                raise
         
         # Upload file
         print(f"📤 Đang upload file: {local_file_path} -> {new_filename}")
@@ -408,13 +410,15 @@ def download_from_ftp(remote_filename: str, local_path: str) -> bool:
         ftp.connect(ftp_host, 21, timeout=30)
         ftp.login(ftp_user, ftp_pass)
         
+        # ✅ BỎ DẤU / Ở ĐẦU - QUAN TRỌNG!
         try:
-            ftp.cwd("public_html/videos")
+            ftp.cwd("public_html")  # ✅ KHÔNG có dấu / ở đầu
+            ftp.cwd("videos")
         except:
             try:
-                ftp.cwd("videos")
+                ftp.cwd("videos")  # Thử videos trực tiếp nếu không có public_html
             except:
-                ftp.cwd("/")
+                pass  # Ở lại root directory
         
         with open(local_path, 'wb') as f:
             ftp.retrbinary(f'RETR {remote_filename}', f.write, 8192)
@@ -442,13 +446,15 @@ def delete_from_ftp(remote_filename: str) -> bool:
         ftp.connect(ftp_host, 21, timeout=30)
         ftp.login(ftp_user, ftp_pass)
         
+        # ✅ BỎ DẤU / Ở ĐẦU - QUAN TRỌNG!
         try:
-            ftp.cwd("public_html/videos")
+            ftp.cwd("public_html")  # ✅ KHÔNG có dấu / ở đầu
+            ftp.cwd("videos")
         except:
             try:
-                ftp.cwd("videos")
+                ftp.cwd("videos")  # Thử videos trực tiếp nếu không có public_html
             except:
-                ftp.cwd("/")
+                pass  # Ở lại root directory
         
         ftp.delete(remote_filename)
         ftp.quit()
