@@ -709,13 +709,15 @@ def analyze_video_with_gemini(video_path_or_url: str, mode: str = "detailed") ->
             except Exception as e:
                 print(f"⚠️ Không thể xóa file ngay: {e}")
         
-        # Đợi file được xử lý (tối đa 2 phút)
+        # ✅ TỐI ƯU: Đợi Google xử lý file (Google đã copy file vào memory của nó)
+        # Render không cần giữ file trên disk nữa, chỉ cần đợi Google xử lý xong
         max_wait = 120  # 2 phút
         waited = 0
         while waited < max_wait:
             file = genai.get_file(uploaded_file.name)
+            # Kiểm tra state: PROCESSING -> ACTIVE -> sẵn sàng dùng
             if file.state.name == "ACTIVE":
-                print("✅ File đã được upload thành công")
+                print("✅ File đã được upload và xử lý thành công bởi Google")
                 # Đảm bảo file đã được xóa (nếu chưa xóa ở trên)
                 if os.path.exists(video_path):
                     try:
@@ -727,7 +729,7 @@ def analyze_video_with_gemini(video_path_or_url: str, mode: str = "detailed") ->
                 # Force garbage collection sau khi upload thành công
                 gc.collect()
                 break
-            if file.state.name == "FAILED":
+            elif file.state.name == "FAILED":
                 error_msg = "Google từ chối file."
                 # Thử lấy thông tin lỗi chi tiết nếu có
                 try:
@@ -736,8 +738,9 @@ def analyze_video_with_gemini(video_path_or_url: str, mode: str = "detailed") ->
                 except:
                     pass
                 raise RuntimeError(error_msg)
-            time.sleep(2)
-            waited += 2
+            # File đang ở trạng thái PROCESSING, tiếp tục đợi
+            time.sleep(3)  # Đợi 3 giây mỗi lần (theo hướng dẫn)
+            waited += 3
             print(f"⏳ Đang chờ Google xử lý file... ({waited}s/{max_wait}s)")
         
         if waited >= max_wait:
