@@ -10,6 +10,7 @@ from flask_sqlalchemy import SQLAlchemy
 from yt_dlp import YoutubeDL
 from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
+from ftplib import FTP
 
 # ==========================================
 # 🔑 API KEY - CHỈ dùng environment variable (KHÔNG hardcode để tránh leak)
@@ -36,15 +37,15 @@ app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # ==========================================
-# DATABASE CONFIGURATION - PostgreSQL hoặc SQLite
+# DATABASE CONFIGURATION - PostgreSQL, MySQL hoặc SQLite
 # ==========================================
-# Trên Render: Sử dụng PostgreSQL (từ DATABASE_URL environment variable)
+# Production: Sử dụng PostgreSQL (Render) hoặc MySQL (hosting khác) từ DATABASE_URL
 # Local dev: Sử dụng SQLite (fallback nếu không có DATABASE_URL)
 # ==========================================
 
 # Lấy DATABASE_URL từ environment variable
-# Trên Render: Phải dùng "Internal Database URL" (không phải External)
-# Format: postgresql://user:password@host:port/database
+# Format PostgreSQL: postgresql://user:password@host:port/database
+# Format MySQL: mysql://user:password@host:port/database
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Nếu không có DATABASE_URL (local dev), dùng SQLite
@@ -60,12 +61,20 @@ if not DATABASE_URL:
     
     print(f"💾 Local dev: Sử dụng SQLite tại {DB_PATH}")
 else:
-    # Production: Sử dụng PostgreSQL
-    print(f"💾 Production: Sử dụng PostgreSQL")
+    # Production: Sử dụng PostgreSQL hoặc MySQL
+    if DATABASE_URL.startswith("mysql"):
+        print(f"💾 Production: Sử dụng MySQL")
+    else:
+        print(f"💾 Production: Sử dụng PostgreSQL")
     
     # Chuyển đổi postgres:// thành postgresql:// (cho SQLAlchemy)
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    # Hỗ trợ MySQL: Chuyển đổi mysql:// thành mysql+pymysql:// (cho SQLAlchemy)
+    if DATABASE_URL.startswith("mysql://"):
+        DATABASE_URL = DATABASE_URL.replace("mysql://", "mysql+pymysql://", 1)
+        print(f"✅ Đã chuyển đổi MySQL connection string")
     
     # Kiểm tra và sửa Internal URL nếu cần
     # Render Internal URLs phải có .render.internal trong hostname
@@ -290,6 +299,61 @@ with app.app_context():
         db.session.commit()
         print(f"⚙️ Đã RESET mật khẩu admin mặc định: {admin_username} / {admin_password}")
 
+# --- FTP HELPER FUNCTIONS ---
+def upload_to_ftp(local_path: str, remote_filename: str) -> bool:
+    """Upload file lên FTP hosting"""
+    try:
+        ftp_host = os.getenv("FTP_HOST")
+        ftp_user = os.getenv("FTP_USER")
+        ftp_pass = os.getenv("FTP_PASS")
+        
+        if not all([ftp_host, ftp_user, ftp_pass]):
+            print("⚠️ FTP credentials chưa được cấu hình, bỏ qua upload FTP")
+            return False
+        
+        print(f"📤 Đang upload video lên FTP: {remote_filename}")
+        with FTP(ftp_host) as ftp:
+            ftp.login(ftp_user, ftp_pass)
+            ftp.set_pasv(True)  # Passive mode
+            
+            # Tạo thư mục videos nếu chưa có
+            try:
+                ftp.mkd("videos")
+            except:
+                pass  # Thư mục đã tồn tại
+            
+            ftp.cwd("videos")
+            
+            with open(local_path, 'rb') as f:
+                ftp.storbinary(f'STOR {remote_filename}', f)
+        
+        print(f"✅ Đã upload video lên FTP: {remote_filename}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Lỗi upload FTP: {e}")
+        return False
+
+def delete_from_ftp(remote_filename: str) -> bool:
+    """Xóa file từ FTP hosting"""
+    try:
+        ftp_host = os.getenv("FTP_HOST")
+        ftp_user = os.getenv("FTP_USER")
+        ftp_pass = os.getenv("FTP_PASS")
+        
+        if not all([ftp_host, ftp_user, ftp_pass]):
+            return False
+        
+        with FTP(ftp_host) as ftp:
+            ftp.login(ftp_user, ftp_pass)
+            ftp.set_pasv(True)
+            ftp.cwd("videos")
+            ftp.delete(remote_filename)
+        
+        print(f"🗑️ Đã xóa video từ FTP: {remote_filename}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Lỗi xóa FTP: {e}")
+        return False
 
 def download_video(url: str) -> str:
     print(f"⬇️ Đang tải video: {url}")
@@ -421,19 +485,15 @@ def download_video(url: str) -> str:
             file_size_mb = file_size / (1024 * 1024)
             print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
             
-            # ✅ GIỚI HẠN 100MB - Đã tăng vì không còn lưu database lịch sử
-            # Không còn lưu lịch sử vào database nên có thể xử lý video lớn hơn
-            if file_size_mb > 100:
-                os.remove(temp_name)  # Xóa ngay để giải phóng bộ nhớ
-                gc.collect()  # Force garbage collection
-                raise RuntimeError(
-                    f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
-                    "💡 Giải pháp:\n"
-                    "• Video nên nhỏ hơn 100MB để tránh lỗi timeout\n"
-                    "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-                    "• Hoặc upgrade lên paid plan để xử lý video lớn hơn\n\n"
-                    "📝 Lưu ý: Chỉ kịch bản được lưu, video KHÔNG được lưu lại"
-                )
+            # ✅ BỎ GIỚI HẠN - Upload lên FTP hosting để giảm tải Render
+            # Video lớn sẽ được upload lên FTP ngay sau khi download
+            # Sau đó xóa khỏi Render để giải phóng bộ nhớ
+            
+            # Upload lên FTP hosting (nếu có cấu hình)
+            remote_filename = temp_name
+            upload_to_ftp(temp_name, remote_filename)
+            
+            # Giữ file trên Render để xử lý (sẽ xóa sau khi xử lý xong)
         
         return temp_name
     except Exception as e:
@@ -747,6 +807,10 @@ def analyze():
                 gc.collect()
             except Exception as e:
                 print(f"⚠️ Không thể xóa file video: {e}")
+        
+        # ✅ Xóa video từ FTP hosting sau khi xử lý xong
+        remote_filename = os.path.basename(video_path)
+        delete_from_ftp(remote_filename)
         
         print("✅ Hoàn thành: Kịch bản đã được lưu, video đã được xóa")
         return jsonify({"script": script_text})
