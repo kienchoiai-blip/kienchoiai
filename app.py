@@ -322,17 +322,25 @@ def upload_video_to_ftp(local_file_path: str) -> str:
         new_filename = f"{name}_{timestamp}{ext}"
         
         print(f"📤 Đang upload video lên FTP: {new_filename}")
+        print(f"🔐 Kết nối FTP: host={ftp_host}, user={ftp_user}")
         
-        with FTP(ftp_host) as ftp:
-            ftp.login(ftp_user, ftp_pass)
-            ftp.set_pasv(True)  # Passive mode
-            
+        ftp = FTP()
+        ftp.set_pasv(True)  # Passive mode (quan trọng cho nhiều hosting)
+        ftp.connect(ftp_host, 21, timeout=30)  # Kết nối với timeout
+        ftp.login(ftp_user, ftp_pass)
+        
+        try:
             # Chuyển đến thư mục public_html
             try:
                 ftp.cwd("public_html")
-            except:
-                print("⚠️ Không tìm thấy public_html, thử root directory")
-                pass
+                print("✅ Đã vào thư mục public_html")
+            except Exception as e:
+                print(f"⚠️ Không tìm thấy public_html: {e}, thử root directory")
+                # Thử các thư mục khác
+                try:
+                    ftp.cwd("/")
+                except:
+                    pass
             
             # Tạo thư mục videos nếu chưa có
             try:
@@ -342,12 +350,15 @@ def upload_video_to_ftp(local_file_path: str) -> str:
                 pass  # Thư mục đã tồn tại
             
             ftp.cwd("videos")
+            print("✅ Đã vào thư mục videos")
             
             # Upload file
+            print(f"📤 Đang upload file: {local_file_path} -> {new_filename}")
             with open(local_file_path, 'rb') as f:
-                ftp.storbinary(f'STOR {new_filename}', f)
+                ftp.storbinary(f'STOR {new_filename}', f, 8192)  # Buffer size 8KB
             
             ftp.quit()
+            print("✅ Đã đóng kết nối FTP")
         
         # Tạo URL công khai
         if ftp_domain:
@@ -359,7 +370,24 @@ def upload_video_to_ftp(local_file_path: str) -> str:
         return public_url
         
     except Exception as e:
-        print(f"⚠️ Lỗi upload FTP: {e}")
+        error_msg = str(e)
+        print(f"❌ Lỗi upload FTP: {error_msg}")
+        
+        # Thông báo lỗi chi tiết hơn
+        if "530" in error_msg or "Login authentication failed" in error_msg:
+            print("❌ LỖI: Đăng nhập FTP thất bại!")
+            print("💡 Kiểm tra lại trên Render Environment Variables:")
+            print("   • FTP_HOST có đúng không? (ví dụ: x51ecaliqiny hoặc IP)")
+            print("   • FTP_USER có đúng không? (ví dụ: x51ecaliqiny)")
+            print("   • FTP_PASS có đúng không? (mật khẩu FTP)")
+            print("   • Đảm bảo không có khoảng trắng thừa ở đầu/cuối")
+        elif "timed out" in error_msg.lower() or "timeout" in error_msg.lower():
+            print("❌ LỖI: Kết nối FTP timeout!")
+            print("💡 Kiểm tra lại FTP_HOST có đúng không?")
+        elif "550" in error_msg:
+            print("❌ LỖI: Không tìm thấy thư mục hoặc không có quyền!")
+            print("💡 Kiểm tra lại quyền truy cập FTP")
+        
         import traceback
         traceback.print_exc()
         return None
@@ -405,16 +433,21 @@ def delete_from_ftp(remote_filename: str) -> bool:
         if not all([ftp_host, ftp_user, ftp_pass]):
             return False
         
-        with FTP(ftp_host) as ftp:
-            ftp.login(ftp_user, ftp_pass)
-            ftp.set_pasv(True)
-            
+        ftp = FTP()
+        ftp.set_pasv(True)
+        ftp.connect(ftp_host, 21, timeout=30)
+        ftp.login(ftp_user, ftp_pass)
+        
+        try:
+            ftp.cwd("public_html/videos")
+        except:
             try:
-                ftp.cwd("public_html/videos")
-            except:
                 ftp.cwd("videos")
-            
-            ftp.delete(remote_filename)
+            except:
+                ftp.cwd("/")
+        
+        ftp.delete(remote_filename)
+        ftp.quit()
         
         print(f"🗑️ Đã xóa video từ FTP: {remote_filename}")
         return True
