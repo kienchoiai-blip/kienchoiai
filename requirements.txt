@@ -6,4 +6,6 @@ google-generativeai
 werkzeug
 gunicorn
 psycopg2-binary
+pymysql
+cryptography
 

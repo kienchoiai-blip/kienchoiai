@@ -300,37 +300,99 @@ with app.app_context():
         print(f"⚙️ Đã RESET mật khẩu admin mặc định: {admin_username} / {admin_password}")
 
 # --- FTP HELPER FUNCTIONS ---
-def upload_to_ftp(local_path: str, remote_filename: str) -> bool:
-    """Upload file lên FTP hosting"""
+def upload_video_to_ftp(local_file_path: str) -> str:
+    """
+    Upload video lên FTP hosting và trả về URL công khai
+    Dựa trên code mẫu từ Gemini
+    """
+    try:
+        ftp_host = os.getenv("FTP_HOST")
+        ftp_user = os.getenv("FTP_USER")
+        ftp_pass = os.getenv("FTP_PASS")
+        ftp_domain = os.getenv("FTP_DOMAIN", "").rstrip('/')
+        
+        if not all([ftp_host, ftp_user, ftp_pass]):
+            print("⚠️ FTP credentials chưa được cấu hình, bỏ qua upload FTP")
+            return None
+        
+        # Tạo tên file mới với timestamp để tránh trùng
+        timestamp = int(time.time())
+        original_filename = os.path.basename(local_file_path)
+        name, ext = os.path.splitext(original_filename)
+        new_filename = f"{name}_{timestamp}{ext}"
+        
+        print(f"📤 Đang upload video lên FTP: {new_filename}")
+        
+        with FTP(ftp_host) as ftp:
+            ftp.login(ftp_user, ftp_pass)
+            ftp.set_pasv(True)  # Passive mode
+            
+            # Chuyển đến thư mục public_html
+            try:
+                ftp.cwd("public_html")
+            except:
+                print("⚠️ Không tìm thấy public_html, thử root directory")
+                pass
+            
+            # Tạo thư mục videos nếu chưa có
+            try:
+                ftp.mkd("videos")
+                print("✅ Đã tạo thư mục videos")
+            except:
+                pass  # Thư mục đã tồn tại
+            
+            ftp.cwd("videos")
+            
+            # Upload file
+            with open(local_file_path, 'rb') as f:
+                ftp.storbinary(f'STOR {new_filename}', f)
+            
+            ftp.quit()
+        
+        # Tạo URL công khai
+        if ftp_domain:
+            public_url = f"{ftp_domain}/videos/{new_filename}"
+        else:
+            public_url = f"http://{ftp_host}/videos/{new_filename}"
+        
+        print(f"✅ Đã upload video lên FTP: {public_url}")
+        return public_url
+        
+    except Exception as e:
+        print(f"⚠️ Lỗi upload FTP: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def download_from_ftp(remote_filename: str, local_path: str) -> bool:
+    """Download file từ FTP hosting về Render (tạm thời để xử lý)"""
     try:
         ftp_host = os.getenv("FTP_HOST")
         ftp_user = os.getenv("FTP_USER")
         ftp_pass = os.getenv("FTP_PASS")
         
         if not all([ftp_host, ftp_user, ftp_pass]):
-            print("⚠️ FTP credentials chưa được cấu hình, bỏ qua upload FTP")
             return False
         
-        print(f"📤 Đang upload video lên FTP: {remote_filename}")
+        print(f"⬇️ Đang download video từ FTP: {remote_filename}")
+        
         with FTP(ftp_host) as ftp:
             ftp.login(ftp_user, ftp_pass)
-            ftp.set_pasv(True)  # Passive mode
+            ftp.set_pasv(True)
             
-            # Tạo thư mục videos nếu chưa có
             try:
-                ftp.mkd("videos")
+                ftp.cwd("public_html/videos")
             except:
-                pass  # Thư mục đã tồn tại
+                ftp.cwd("videos")
             
-            ftp.cwd("videos")
-            
-            with open(local_path, 'rb') as f:
-                ftp.storbinary(f'STOR {remote_filename}', f)
+            with open(local_path, 'wb') as f:
+                ftp.retrbinary(f'RETR {remote_filename}', f.write)
         
-        print(f"✅ Đã upload video lên FTP: {remote_filename}")
+        print(f"✅ Đã download video từ FTP: {remote_filename}")
         return True
+        
     except Exception as e:
-        print(f"⚠️ Lỗi upload FTP: {e}")
+        print(f"⚠️ Lỗi download FTP: {e}")
         return False
 
 def delete_from_ftp(remote_filename: str) -> bool:
@@ -346,7 +408,12 @@ def delete_from_ftp(remote_filename: str) -> bool:
         with FTP(ftp_host) as ftp:
             ftp.login(ftp_user, ftp_pass)
             ftp.set_pasv(True)
-            ftp.cwd("videos")
+            
+            try:
+                ftp.cwd("public_html/videos")
+            except:
+                ftp.cwd("videos")
+            
             ftp.delete(remote_filename)
         
         print(f"🗑️ Đã xóa video từ FTP: {remote_filename}")
@@ -485,15 +552,21 @@ def download_video(url: str) -> str:
             file_size_mb = file_size / (1024 * 1024)
             print(f"📊 Kích thước video sau khi download: {file_size_mb:.2f} MB")
             
-            # ✅ BỎ GIỚI HẠN - Upload lên FTP hosting để giảm tải Render
-            # Video lớn sẽ được upload lên FTP ngay sau khi download
-            # Sau đó xóa khỏi Render để giải phóng bộ nhớ
+            # ✅ Upload lên FTP hosting ngay sau khi download
+            # Video sẽ được lưu trên FTP, không tốn storage của Render
+            ftp_url = upload_video_to_ftp(temp_name)
             
-            # Upload lên FTP hosting (nếu có cấu hình)
-            remote_filename = temp_name
-            upload_to_ftp(temp_name, remote_filename)
-            
-            # Giữ file trên Render để xử lý (sẽ xóa sau khi xử lý xong)
+            if ftp_url:
+                # Xóa file khỏi Render ngay sau khi upload lên FTP
+                # Video sẽ được download lại từ FTP khi cần xử lý
+                os.remove(temp_name)
+                gc.collect()
+                print(f"🗑️ Đã xóa video khỏi Render, video đã được lưu trên FTP: {ftp_url}")
+                # Trả về FTP URL thay vì local path
+                return ftp_url
+            else:
+                # Nếu không upload được FTP, giữ file trên Render để xử lý
+                print("⚠️ Không upload được FTP, giữ file trên Render để xử lý")
         
         return temp_name
     except Exception as e:
@@ -507,23 +580,38 @@ def download_video(url: str) -> str:
         error_msg = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
         raise RuntimeError(f"Lỗi tải video: {error_msg}")
 
-def analyze_video_with_gemini(video_path: str, mode: str = "detailed") -> str:
+def analyze_video_with_gemini(video_path_or_url: str, mode: str = "detailed") -> str:
+    """
+    Phân tích video với Gemini API
+    video_path_or_url: có thể là local path hoặc FTP URL
+    """
+    is_from_ftp = False
+    video_path = None
+    remote_filename = None
+    
+    # Nếu là FTP URL, download về Render tạm thời để xử lý
+    if video_path_or_url.startswith("http://") or video_path_or_url.startswith("https://"):
+        print(f"📥 Đây là FTP URL, đang download về Render tạm thời...")
+        ftp_url = video_path_or_url
+        remote_filename = os.path.basename(ftp_url)
+        video_path = f"temp_{int(time.time())}_{remote_filename}"
+        
+        if not download_from_ftp(remote_filename, video_path):
+            raise RuntimeError("Không thể download video từ FTP")
+        
+        is_from_ftp = True
+        print(f"✅ Đã download video từ FTP về Render: {video_path}")
+    else:
+        video_path = video_path_or_url
+        is_from_ftp = False
+    
     # Kiểm tra kích thước file trước khi upload
     file_size = os.path.getsize(video_path)
     file_size_mb = file_size / (1024 * 1024)
     print(f"📊 Kích thước file: {file_size_mb:.2f} MB")
     
-    # ✅ GIỚI HẠN 100MB - Đã tăng vì không còn lưu database lịch sử
-    # Không còn lưu lịch sử vào database nên có thể xử lý video lớn hơn
-    if file_size_mb > 100:
-        raise RuntimeError(
-            f"⚠️ Video quá lớn ({file_size_mb:.1f} MB)!\n\n"
-            "💡 Giải pháp:\n"
-            "• Video nên nhỏ hơn 100MB để tránh lỗi timeout\n"
-            "• Thử video ngắn hơn hoặc chất lượng thấp hơn\n"
-            "• Hoặc upgrade lên paid plan để xử lý video lớn hơn\n\n"
-            "📝 Lưu ý: Chỉ kịch bản được lưu, video KHÔNG được lưu lại"
-        )
+    # ✅ BỎ GIỚI HẠN - Video đã được lưu trên FTP, không tốn storage Render
+    # Không cần giới hạn kích thước nữa vì video không còn lưu trên Render lâu dài
     
     print("🚀 Đang gửi video lên AI...")
     uploaded_file = None
@@ -744,6 +832,23 @@ Ví dụ format:
                 print("🗑️ Đã xóa file từ Google (cleanup)")
             except:
                 pass
+        
+        # Nếu video được download từ FTP, xóa file local và xóa từ FTP
+        try:
+            if 'is_from_ftp' in locals() and is_from_ftp:
+                if 'video_path' in locals() and video_path and os.path.exists(video_path):
+                    try:
+                        os.remove(video_path)
+                        print("🗑️ Đã xóa file tạm thời từ Render")
+                    except:
+                        pass
+                
+                # Xóa video từ FTP sau khi xử lý xong
+                if 'remote_filename' in locals() and remote_filename:
+                    delete_from_ftp(remote_filename)
+        except:
+            pass
+        
         # Force garbage collection nhiều lần sau khi cleanup để giải phóng memory tối đa
         gc.collect()
         gc.collect()
@@ -799,18 +904,16 @@ def analyze():
         # → TIẾT KIỆM MEMORY/DATABASE TỐI ĐA
         print("✅ Đã tạo kịch bản thành công - KHÔNG lưu vào database (tiết kiệm memory)")
 
-        # ✅ Đảm bảo video đã được xóa (đã xóa trong analyze_video_with_gemini, nhưng kiểm tra lại)
-        if os.path.exists(video_path):
-            try:
-                os.remove(video_path)
-                print("🗑️ Đã xóa file video cuối cùng (đảm bảo cleanup)")
-                gc.collect()
-            except Exception as e:
-                print(f"⚠️ Không thể xóa file video: {e}")
-        
-        # ✅ Xóa video từ FTP hosting sau khi xử lý xong
-        remote_filename = os.path.basename(video_path)
-        delete_from_ftp(remote_filename)
+        # ✅ Đảm bảo video đã được xóa (đã xóa trong analyze_video_with_gemini)
+        # Nếu video_path_or_url là local path (không phải FTP URL), xóa nó
+        if not (video_path_or_url.startswith("http://") or video_path_or_url.startswith("https://")):
+            if os.path.exists(video_path_or_url):
+                try:
+                    os.remove(video_path_or_url)
+                    print("🗑️ Đã xóa file video cuối cùng (đảm bảo cleanup)")
+                    gc.collect()
+                except Exception as e:
+                    print(f"⚠️ Không thể xóa file video: {e}")
         
         print("✅ Hoàn thành: Kịch bản đã được lưu, video đã được xóa")
         return jsonify({"script": script_text})
